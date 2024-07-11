@@ -1,0 +1,127 @@
+---
+title: "RelativeAbundances_FigS2"
+author: "Deepan"
+date: "7/11/2024"
+output: html_document
+---
+
+#Import the final feature table
+
+```{r}
+
+temp <- read.table("Final_genomelengthnormalized_topspec_relative.tsv",
+                    sep="\t", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    na.strings = "",
+                   row.names = 1,
+                    check.names = FALSE, 
+                    comment.char = "")
+
+
+
+temp$Group.1 <- rownames(temp)
+temp$Group.1 <- ordered(temp$Group.1, levels = c(rownames(temp)))
+
+log_temp <- temp #to get log ratios
+```
+
+#Formatting the melt table 
+
+```{r}
+
+log_temp[,1:98] <- as.data.frame(t(apply(log_temp[,1:98],1, function(x) log10( (x/as.numeric(log_temp[1,])))))) # taking log ratios against C.acnes since C.acnes is the most abundant skin taxa across all body sites (Byrd et al. 2018, Grice et al. 2008). Log ratios account for compositionality and can ensure unbiased measures of microbiome shifts (Morton et al. 2019)
+
+
+log_temp <- log_temp[-1,]
+log_temp <- log_temp[-nrow(log_temp),]
+
+
+log_temp_melt <- melt(log_temp[,str_detect(colnames(log_temp), "Group|PMA")])
+log_temp_melt$variable <- str_replace(log_temp_melt$variable, "-PMA", "")
+log_temp_melt$Group <- paste(log_temp_melt$Group.1, log_temp_melt$variable, sep = "_")
+
+log_temp_nopma <- melt(log_temp[,!str_detect(colnames(log_temp), "PMA")])
+log_temp_nopma$Group <- paste(log_temp_nopma$Group.1, log_temp_nopma$variable, sep = "_")
+
+log_temp_melt <- merge(log_temp_melt, log_temp_nopma[, c(3,4)], by = "Group")
+colnames(log_temp_melt) <- c("Taxa_bp", "Taxa", "Body_Part", "PMA", "Raw")
+
+log_temp_melt$Skin_Type <- log_temp_melt$Body_Part
+
+log_temp_melt$Body_Part <- ifelse(str_detect(log_temp_melt$Body_Part, "AC"), "Antecubital Crease (n=8)",
+                         ifelse(str_detect(log_temp_melt$Body_Part, "PC"), "Popliteal Crease (n=8)",
+                                ifelse(str_detect(log_temp_melt$Body_Part, "FA"), "Forearm (n=6)",
+                                       ifelse(str_detect(log_temp_melt$Body_Part, "Abd"), "Abdomen (n=2)",
+                                              ifelse(str_detect(log_temp_melt$Body_Part, "FH"), "Forehead (n=10)", "Upper Back (n=10)")))))
+log_temp_melt$Skin_Type <- ifelse(str_detect(log_temp_melt$Skin_Type, "Abd|FA"), "Dry (n=10)",
+                         ifelse(str_detect(log_temp_melt$Skin_Type, "AC|PC"), "Moist (n=18)", "Sebaceous (n=21)"))
+log_temp_melt <- log_temp_melt[,-1]
+
+log_temp_melt$Taxa_SkinType <- paste(log_temp_melt$Taxa, log_temp_melt$Skin_Type, sep = "_")
+
+```
+
+#wilcox test of the log ratios
+
+```{r}
+
+#compute pairwise wilcoxon test of the taxa within each skin type sample
+grouped_data <- log_temp_melt %>%
+  group_by(Taxa_SkinType)
+# Create an empty dataframe to store results
+results_SkinType <- data.frame()
+
+# Loop through each group and perform Wilcoxon tests
+for (group_name in unique(grouped_data$Taxa_SkinType)) {
+  group_subset <- grouped_data %>% filter(Taxa_SkinType == group_name)
+  wilcox_result <- wilcox.test(group_subset$PMA, group_subset$Raw, paired = TRUE)
+  n_comparisons <- nrow(group_subset)
+  
+  adjusted_p_values <- ifelse (nrow(group_subset) <= 100, wilcox_result$p.value, p.adjust(wilcox_result$p.value, method = "bonferroni", n = n_comparisons))
+  
+  # Store the results
+  result_row <- data.frame(
+  Group = group_name,
+    N = n_comparisons,
+    PValue = wilcox_result$p.value,
+    CorrectedPValue = adjusted_p_values
+  )
+  results_SkinType <- rbind(results_SkinType, result_row)
+}
+
+results_SkinType$SkinType <- str_split(results_SkinType$Group, "_", simplify = TRUE)[,2]
+results_SkinType$Taxa <- str_split(results_SkinType$Group, "_", simplify = TRUE)[,1]
+results_SkinType$group1 <- c(rep("PMA", nrow(results_SkinType)))
+results_SkinType$group2 <- c(rep("Raw", nrow(results_SkinType)))
+results_SkinType$`p.adj` <- results_SkinType$CorrectedPValue
+results_SkinType$p.adj <- sapply(results_SkinType$p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+
+```
+
+#plotting log ratios:
+
+```{r}
+
+log_temp_melt <- melt(log_temp_melt)
+
+#merge Wilcox results with live_percent for plotting
+colnames(log_temp_melt)[ncol(log_temp_melt)-2] <- "Group"
+log_temp_melt<- merge(log_temp_melt, results_SkinType[,c(-5,-6)], by = "Group")
+log_temp_melt$p.adj[str_detect(log_temp_melt$p.adj,"ns")] <- ""
+log_temp_melt$p.adj[duplicated(log_temp_melt$Group) == TRUE] <- ""
+log_temp_melt$position <- 100
+log_temp_melt$p.adj <- str_split(log_temp_melt$p.adj, " ", simplify = TRUE)[,1]
+
+log_temp_melt$Skin_Type <- ordered(log_temp_melt$Skin_Type, levels = c("Sebaceous (n=21)", "Moist (n=18)", "Dry (n=10)"))
+
+#plot
+
+#svg("/home/deepan/Dropbox/Deepan-Only/UCSD/Zengler Lab/Skin Microbiome/LiveDead/PaperFigures/Final/log_ratios_relativeabundance.svg", height = 6, width = 10)
+ggplot(log_temp_melt, aes(x = value, y = Taxa)) + geom_boxplot(aes(fill = variable)) + facet_wrap(~Skin_Type)  + scale_y_discrete(limits = rev) + theme_boxp() + scale_fill_manual(values = c("moccasin", "tomato4"))
+#dev.off()
+
+```
+
+
