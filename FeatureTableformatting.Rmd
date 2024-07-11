@@ -1,0 +1,89 @@
+---
+title: "Formatted-featuretables"
+author: "Deepan"
+date: "7/11/2024"
+output: html_document
+---
+
+##Generated Feature Tables from woltka were imported as tsv files and aggregated at species level for taxonomy analysis.
+
+
+```{r}
+# Count tables with taxonomy annotations (Woltka stratified output following Zebra filter)
+tax <- read.table("Skin_LiveDead_Zebra_25perc_Classify_Species.tsv", 
+                    sep="\t", 
+                    dec=".", 
+                    header = TRUE, 
+                    stringsAsFactors = FALSE, 
+                    na.strings = NA, 
+                    check.names = FALSE, 
+                    comment.char = "")
+
+```
+
+#formatting
+
+```{r}
+
+colnames(tax) <- str_replace(colnames(tax), "_filtered", "")
+colnames(tax) <- str_replace(colnames(tax), "-PMA", "_PMA")
+dim(tax)
+
+```
+
+#combining the bis and nobis, taken from the same individual on different days
+
+```{r}
+
+bis <- tax[,str_detect(colnames(tax), "1bis") & !str_detect(colnames(tax), "10-|11-")]
+colnames(bis) <- str_replace(colnames(bis), "bis", "")
+nobis <- tax[,str_detect(colnames(tax), "1-") & !str_detect(colnames(tax), "10-|11-")]
+
+bis <- bis[names(nobis)] #only keeping the bis samples that have a nobis sample
+
+bis <- as.data.frame(rbind(t(bis), t(nobis)))
+bis$Sample <- rownames(bis)
+bis$Sample <- str_replace(bis$Sample, "X", "")
+bis$Sample <- str_replace(bis$Sample, ".1", "")
+
+bis <- aggregate(bis, by = list(bis$Sample), mean)
+
+bis <- as.data.frame(t(bis))
+colnames(bis) <- bis[1,]
+bis <- bis[-1,]
+bis <- bis[-nrow(bis),]
+colnames(bis) <- str_replace(colnames(bis), "\\.", "-")
+
+bis <- bis[names(tax[,str_detect(colnames(tax), "1-") & !str_detect(colnames(tax), "10-|11-")])]
+
+tax[,str_detect(colnames(tax), "1-") & !str_detect(colnames(tax), "10-|11-")] <- bis
+colnames(bis) <- str_replace(colnames(bis), "1-", "1bis-")
+tax <- tax[,!colnames(tax) %in% colnames(bis)]
+colnames(tax)[str_detect(colnames(tax), "bis")] <- str_replace(colnames(tax)[str_detect(colnames(tax), "bis")], "bis", "")
+tax[,-1] <- sapply(tax[,-1], as.numeric)
+colnames(tax) <- str_replace(colnames(tax), "_PMA", "-PMA")
+```
+
+#ensure only Raw and PMA pairs of samples are included for analysis. 
+
+```{r}
+
+pma <- tax[,str_detect(colnames(tax), "-PMA|Group.1")]
+colnames(pma) <- str_replace(colnames(pma), "-PMA", "")
+nopma <- tax[,!str_detect(colnames(tax), "-PMA")]
+nopma <- nopma[, colnames(nopma)%in% c(colnames(pma))]
+
+tax <- tax[,colnames(tax) %in% c(colnames(nopma), c(paste(colnames(nopma), "-PMA", sep=""))[-1])]
+tax <- tax[,c(colnames(tax[!str_detect(colnames(tax), "0|11|12")]), colnames(tax[str_detect(colnames(tax), "0|11|12")]))]
+
+```
+
+#export formatted feature table.
+
+```{r}
+
+write.table(tax, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/BIOM_files/ZebraFilter/Final_Species_frequency.tsv", row.names = FALSE)
+
+```
+
+
