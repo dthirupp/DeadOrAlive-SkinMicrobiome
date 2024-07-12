@@ -1,0 +1,311 @@
+---
+title: "TaxaAbsoluteCounts"
+author: "Deepan"
+date: "7/11/2024"
+output: html_document
+---
+
+```{r}
+
+data_length <- read.table("Final_genomelengthnormalized_topspec_relative.tsv",
+                    sep="\t", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    row.names = 1,
+                    na.strings = "",
+                    check.names = FALSE, 
+                    comment.char = "")
+
+counts <- read.table("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/BIOM_files/ZebraFilter/Final_CellCounts.tsv",
+                    sep="\t", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    row.names = 1,
+                    na.strings = "",
+                    check.names = FALSE, 
+                    comment.char = "")
+
+#set custom order for samples to be maintained throughout script
+
+counts$Sample <- ordered(counts$Sample, levels = sample_order)
+counts <- counts[order(counts$Sample),]
+
+#create a live percent column for the samples. 
+counts$percent_live <- 100 * (counts$PMA / counts$Raw)
+```
+
+# Absolute Cell density of top 15 taxa. 
+
+```{r}
+
+taxa_counts <- data_length
+rownames(taxa_counts) <- taxa_counts$Group.1
+
+taxa_counts <- taxa_counts[, colnames(taxa_counts) %in% c(sample_order, "Group.1")]
+taxa_counts <- taxa_counts[, c("Group.1", sample_order)]
+
+numbers <- melt(counts[, !colnames(counts) %in% c("dead", "percent_dead", "frac_liv", "percent_live")])
+numbers$Sample <- ifelse(numbers$variable == "PMA", paste(numbers$Sample, numbers$variable, sep = "-"), as.character(numbers$Sample))
+
+#setting order of both dfs  to match for multiplication
+taxa_counts <- taxa_counts[, c("Group.1", numbers$Sample)]
+taxa_counts <- numbers$value * as.data.frame(t(taxa_counts[,-1]))
+
+#only keeping top 15 taxa
+taxa_counts <- taxa_counts[,colnames(taxa_counts) %in% c(as.character(data_length$Group.1)[1:15])]
+taxa_counts$Sample <- rownames(taxa_counts)
+
+#creating a dataframe to calculate percent live of each taxa
+live_percent <- melt(taxa_counts[str_detect(taxa_counts$Sample, "PMA"), !colnames(taxa_counts) %in% c("variable")])
+colnames(live_percent)[ncol(live_percent)] <- "PMA"
+live_percent$Sample <- str_replace(live_percent$Sample, "-PMA", "")
+
+live_percent$Raw <- melt(taxa_counts[!str_detect(taxa_counts$Sample, "PMA|Group.1"),])[,3]
+colnames(live_percent)[2] <- "Taxa"
+live_percent$Live <- (live_percent$PMA/ live_percent$Raw) * 100 
+live_percent$PMA[live_percent$Live > 100] <- live_percent$Raw[live_percent$Live > 100]
+live_percent$Live <- (live_percent$PMA/ live_percent$Raw) * 100 
+live_percent$Skin_Type <- ifelse(str_detect(live_percent$Sample, "Abd|FA"), "Dry (n=8)",
+                         ifelse(str_detect(live_percent$Sampl, "AC|PC"), "Moist (n=16)", "Sebaceous (n=20)"))
+
+live_percent$Body_Part <- ifelse(str_detect(live_percent$Sample, "AC"), "Antecubital Crease (n=8)",
+                         ifelse(str_detect(live_percent$Sample, "PC"), "Popliteal Crease (n=8)",
+                                ifelse(str_detect(live_percent$Sample, "FA"), "Forearm (n=6)",
+                                       ifelse(str_detect(live_percent$Sample, "Abd"), "Abdomen (n=2)",
+                                              ifelse(str_detect(live_percent$Sample, "FH"), "Forehead (n=10)", "Upper Back (n=10)")))))
+
+#reassigning absolute abundance values to all taxa
+temp <- live_percent[,!colnames(live_percent) %in% c("Live", "Skin_Type", "Body_Part", "Raw")]
+colnames(temp)[3] <- "Raw"
+temp <- rbind(temp, live_percent[,!colnames(live_percent) %in% c("Live", "Skin_Type", "Body_Part", "PMA")])
+temp$Sample[1:660] <- paste(temp$Sample[1:660], "-PMA", sep = "")
+
+taxa_counts <- dcast(temp, Sample~Taxa)
+taxa_counts <- merge(taxa_counts, numbers[, !colnames(numbers) %in% c("value")], by = "Sample")
+taxa_counts <- melt(taxa_counts)
+colnames(taxa_counts) <- c("Sample", "Indiv", "Body_Part", "Skin_Type", "Treatment", "Taxa", "Count")
+taxa_counts$Sample <- str_replace(taxa_counts$Sample, "-PMA", "")
+taxa_counts$Treatment <- ordered(taxa_counts$Treatment, levels = c("Raw", "PMA"))
+
+```
+
+#pairwise wilcox test for each taxa in each skin type
+
+```{r}
+
+#make new column for grouping taxa within skin types
+live_percent$Taxa_SkinType <- paste(live_percent$Taxa, live_percent$Skin_Type, sep = "-")
+
+#compute pairwise wilcoxon test of the taxa within each skin type sample
+grouped_data <- live_percent %>%
+  group_by(Taxa_SkinType)
+# Create an empty dataframe to store results
+results_SkinType <- data.frame()
+
+# Loop through each group and perform Wilcoxon tests
+for (group_name in unique(grouped_data$Taxa_SkinType)) {
+  group_subset <- grouped_data %>% filter(Taxa_SkinType == group_name)
+  wilcox_result <- wilcox.test(group_subset$PMA, group_subset$Raw, paired = TRUE)
+  n_comparisons <- nrow(group_subset)
+  
+  adjusted_p_values <- ifelse (nrow(group_subset) <= 100, wilcox_result$p.value, p.adjust(wilcox_result$p.value, method = "bonferroni", n = n_comparisons))
+  
+  # Store the results
+  result_row <- data.frame(
+  Group = group_name,
+    N = n_comparisons,
+    PValue = wilcox_result$p.value,
+    CorrectedPValue = adjusted_p_values
+  )
+  results_SkinType <- rbind(results_SkinType, result_row)
+}
+
+results_SkinType$SkinType <- str_split(results_SkinType$Group, "-", simplify = TRUE)[,2]
+results_SkinType$Taxa <- str_split(results_SkinType$Group, "-", simplify = TRUE)[,1]
+results_SkinType$group1 <- c(rep("PMA", nrow(results_SkinType)))
+results_SkinType$group2 <- c(rep("Raw", nrow(results_SkinType)))
+results_SkinType$`p.adj` <- results_SkinType$CorrectedPValue
+results_SkinType$p.adj <- sapply(results_SkinType$p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+results_SkinType$p.adj <- paste(results_SkinType$p.adj, " (n=", results_SkinType$N, ")", sep = "")
+
+```
+
+#Formatting table for Fig 3 plots
+
+```{r}
+
+live_counts <- aggregate(live_percent[,c(4,5)], by = list(live_percent$Taxa, live_percent$Skin_Type, live_percent$Group), median)
+live_counts <- melt(live_counts)
+colnames(live_counts) <- c("Taxa", "Skin_Type", "Group", "Treatment", "Count") 
+
+live_counts$Treatment <- ordered(live_counts$Treatment, levels = c("Raw", "PMA"))
+live_counts <- merge(live_counts, results_SkinType[,c(-5,-6)], by = "Group", all.x = TRUE)
+live_counts$p.adj[str_detect(live_counts$p.adj,"ns")] <- ""
+live_counts$p.adj[duplicated(live_counts$Group) == TRUE] <- ""
+live_counts$position <- live_counts$p.adj
+live_counts$position <- ifelse(live_counts$position != "", -0.05, NA)
+live_counts$p.adj <- str_split(live_counts$p.adj, " ", simplify = TRUE)[,1]
+
+live_counts$Taxa <- ordered(live_counts$Taxa, levels = ra_abundance_order)
+live_counts_pma$Skin_Type <- ordered(live_counts_pma$Skin_Type, levels = c("Sebaceous (n=20)", "Moist (n=16)", "Dry (n=8)"))
+
+```
+
+#Plotting staggered barplots
+
+```{r, fig.width = 5, fig.height=5}
+
+sebaceous_plot <- ggplot(data = live_counts[live_counts$Skin_Type == "Sebaceous (n=20)",], mapping = aes(y = Taxa, x = Count)) + 
+  geom_bar(data = live_counts[live_counts$Skin_Type == "Sebaceous (n=20)" & live_counts$Treatment == "Raw",], fill = NA, aes(color = Taxa),  stat = "identity", position = "dodge", width = 0.5) + 
+  geom_bar(data = live_counts[live_counts$Skin_Type == "Sebaceous (n=20)" & live_counts$Treatment == "PMA",], aes(fill = Taxa), position = position_dodge(width = 0), stat = "identity", width = 0.5) + 
+  scale_y_discrete(limits =  rev) +
+  scale_fill_manual(values = vec_col0) +
+  scale_color_manual(values = vec_col0) +
+  theme_boxp() + 
+  theme(legend.position = "none", legend.spacing.y = unit(2, "mm"), axis.text.x = element_text(size =8, angle = 45), axis.text.y = element_text(face = "italic", size = 10), axis.title.y = element_blank(), axis.title.x = element_text(size = 12), panel.border = element_rect(size = 0.1), panel.grid.major.x = element_blank(), panel.grid.major.y = element_blank(), axis.text.y.right = element_blank(), axis.text.x.top = element_blank(), plot.title = element_text(hjust = 0.5)) +
+  labs(x= "Cells per sq cm", title = "Sebaceous Skin Type (n=20)")
+  
+
+moist_plot <- ggplot(data = live_counts[live_counts$Skin_Type == "Moist (n=16)",], mapping = aes(y = Taxa, x = Count)) + 
+  geom_bar(data = live_counts[live_counts$Skin_Type == "Moist (n=16)" & live_counts$Treatment == "Raw",], fill = NA, aes(color = Taxa),  stat = "identity", position = "dodge", width = 0.5) + 
+  geom_bar(data = live_counts[live_counts$Skin_Type == "Moist (n=16)" & live_counts$Treatment == "PMA",], aes(fill = Taxa), position = position_dodge(width = 0), stat = "identity", width = 0.5) + 
+  scale_y_discrete(limits =  rev) +
+  scale_fill_manual(values = vec_col0) +
+  scale_color_manual(values = vec_col0) +
+  theme_boxp() + 
+  theme(legend.position = "none", legend.spacing.y = unit(2, "mm"), axis.text.x = element_text(size =8, angle = 45), axis.text.y = element_text(face = "italic", size = 10), axis.title.y = element_blank(), axis.title.x = element_text(size = 12), panel.border = element_rect(size = 0.1), panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(), axis.text.y.right = element_blank(), axis.text.x.top = element_blank(), plot.title = element_text(hjust = 0.5)) + 
+  labs(x= "Cells per sq cm", title = "Moist Skin Type (n=16)")
+ 
+
+dry_plot <- ggplot(data = live_counts[live_counts$Skin_Type == "Dry (n=8)",], mapping = aes(y = Taxa, x = Count)) + 
+  geom_bar(data = live_counts[live_counts$Skin_Type == "Dry (n=8)" & live_counts$Treatment == "Raw",], fill = NA, aes(color = Taxa),  stat = "identity", position = "dodge", width = 0.5) + 
+  geom_bar(data = live_counts[live_counts$Skin_Type == "Dry (n=8)" & live_counts$Treatment == "PMA",], aes(fill = Taxa), position = position_dodge(width = 0), stat = "identity", width = 0.5) + 
+  scale_y_discrete(limits =  rev) +
+  scale_fill_manual(values = vec_col0) +
+  scale_color_manual(values = vec_col0) +
+  theme_boxp() + 
+  theme(legend.position = "none", legend.spacing.y = unit(2, "mm"), axis.text.x = element_text(size =8, angle = 45), axis.text.y = element_text(face = "italic", size = 10), axis.title.y = element_blank(), axis.title.x = element_text(size = 12), panel.border = element_rect(size = 0.1), plot.title = element_text(hjust = 0.5), panel.grid.minor = element_blank(), panel.grid.major.y = element_blank()) + 
+  labs(x= "Cells per sq cm", title = "Dry Skin Type (n=8)") + 
+  theme(axis.text.y.right = element_blank(), axis.text.x.top = element_blank())
+
+```
+
+#plotting
+
+```{r}
+
+sebaceous_plot + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                       axis.text.x = element_blank(),
+                       plot.title = element_blank()) +
+  coord_cartesian(xlim = c(0.01,15))
+
+sebaceous_plot  + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                        axis.text.x = element_blank(),
+                        plot.title = element_blank()) +
+  coord_cartesian(xlim = c(50,400))
+
+sebaceous_plot + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                       axis.text.x = element_blank(),
+                       plot.title = element_blank()) +
+  coord_cartesian(xlim = c(12000,20000))
+
+
+
+moist_plot + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                   axis.text.x = element_blank(),
+                   plot.title = element_blank()) +
+  coord_cartesian(xlim = c(0.01,15))
+
+moist_plot + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                   axis.text.x = element_blank(),
+                   plot.title = element_blank()) +
+  coord_cartesian(xlim = c(25,40))
+
+moist_plot + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                   axis.text.x = element_blank(),
+                   plot.title = element_blank()) +
+  coord_cartesian(xlim = c(100,900))
+
+
+
+dry_plot + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                 axis.text.x = element_blank(),
+                 plot.title = element_blank()) +
+  coord_cartesian(xlim = c(0.01,15))
+
+dry_plot + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                 axis.text.x = element_blank(),
+                 plot.title = element_blank()) +
+  coord_cartesian(xlim = c(20,50))
+
+dry_plot + theme(axis.text.y = element_blank(), axis.title.x = element_blank(),
+                 axis.text.x = element_blank(),
+                 plot.title = element_blank()) +
+  coord_cartesian(xlim = c(800,980))
+
+```
+
+#Computing taxa-specific z-score across skin site types for PMA vs Raw and standard deviation across Indvidauals in PMA samples vs Raw
+
+```{r}
+
+temp <- aggregate(live_percent[,c(4,5)], by = list(live_percent$Taxa, live_percent$Skin_Type, live_percent$Group), sd)
+
+temp <- melt(temp)
+colnames(temp)[4:5] <- c("Treatment", "sd")
+temp$Group <- paste(temp$Group.3, temp$Treatment, sep = "-")
+
+live_counts_pma <- live_counts[,c(2,3,4,5)]
+live_counts_pma$Group <- paste(live_counts_pma$Taxa, live_counts$Skin_Type, live_counts_pma$Treatment, sep = "-")
+live_counts_pma <- merge(live_counts_pma, temp[,c(5:6)], by = "Group")
+
+ra_abundance_order <- data_length$Group.1[data_length$Group.1 %in% as.character(unique(live_counts_pma$Taxa))]
+
+#Zscore by Taxa
+live_counts_pma$Group <- paste(live_counts_pma$Taxa, live_counts_pma$Treatment, sep = "-")
+
+live_counts_pma <- live_counts_pma %>%
+  group_by(Group) %>%
+  mutate(z_score_count = scale(Count))
+
+live_counts_pma$Group <- paste(live_counts_pma$Taxa, live_counts_pma$Skin_Type, sep = "-")
+
+live_counts_pma <- live_counts_pma %>%
+  group_by(Group) %>%
+  mutate(z_score_sd = scale(sd))
+
+live_counts_pma$Taxa <- ordered(live_counts_pma$Taxa, levels = ra_abundance_order)
+live_counts_pma$Skin_Type <- ordered(live_counts_pma$Skin_Type, levels = c("Sebaceous (n=20)", "Moist (n=16)", "Dry (n=8)"))
+
+ggplot(live_counts_pma, aes(y = Taxa, x = Skin_Type, fill = log10(Count))) + 
+  geom_tile(color ="white") + 
+  scale_fill_gradient2(low = "royalblue1", mid = "white", high = "brown", midpoint = 0) + # Define color gradient
+  facet_wrap(~Treatment) +
+  scale_y_discrete(limits = rev) +
+  theme_minimal() +
+  labs(x = "Skin Type (seb, moist, dry)") +
+  theme(axis.text.x = element_blank(), axis.text.y = element_text(face = "italic"))
+
+ggplot(live_counts_pma, aes(y = Taxa, x = Skin_Type, fill =z_score_count )) + 
+  geom_tile(color ="white") + 
+  scale_fill_gradient2(low = "royalblue1", mid = "white", high = "brown", midpoint = 0) + # Define color gradient
+  facet_wrap(~Treatment) +
+  scale_y_discrete(limits = rev) +
+  theme_minimal() +
+  labs(x = "Skin Type (seb, moist, dry)") +
+  theme(axis.text.x = element_blank(), axis.text.y = element_text(face = "italic"))
+
+ggplot(live_counts_pma, aes(y = Taxa, x = Treatment, fill = log10(sd))) + 
+  geom_tile(color ="white") + 
+  scale_fill_gradient2(low = "#0072B2", mid = "white", high = "#D55E00", midpoint = log10(median(live_counts_pma$sd))) + # Define color gradient
+  facet_wrap(~Skin_Type) +
+  scale_y_discrete(limits = rev) +
+  theme_minimal() +
+  labs(x = "Raw vs PMA-treated") +
+  theme(axis.text.x = element_blank(), axis.text.y = element_text(face = "italic"))
+
+```
+
+
