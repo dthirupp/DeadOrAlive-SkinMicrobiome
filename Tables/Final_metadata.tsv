@@ -1,0 +1,99 @@
+,Sample,Indiv,BodySite_ID,PMA_treated,Body_Part,Skin_Type,Swab_Dimensions_sqcm,Age,Sex,Ethnicity,Face_wash,Face_care_fq_by_day,Face_care_products,Face_sunscreen,Body_shower_fq_by_day,Body_shower_products,Body_care_fq_by_day,Body_care_products,Exercise_per_week,Pets,Ocean_per_week,Pool_per_week,Sauna/Hammam,Other comments,Cell_Count_Absolute_cellsperuL,Total_Cells_per_sqcm
+1-Abd,1-Abd,1,Abd,Raw,Abdomen,Dry,50.41,33,F,white,water,1,natural,daily,0.5,bar_soap,0,none,7,cat,3,0,0,NA,12319,73314
+1-Abd-PMA,1-Abd-PMA,1,Abd,PMA,Abdomen,Dry,50.41,33,F,white,water,1,natural,daily,0.5,bar_soap,0,none,7,cat,3,0,0,no bacteria or bead detected in FC,#DIV/0!,#VALUE!
+1-AC,1-AC,1,AC,Raw,Antecubital_crease,Moist,35,33,F,white,water,1,natural,daily,0.5,bar_soap,0,none,7,cat,3,0,0,NA,2624,22489
+1-AC-PMA,1-AC-PMA,1,AC,PMA,Antecubital_crease,Moist,35,33,F,white,water,1,natural,daily,0.5,bar_soap,0,none,7,cat,3,0,0,NA,1279,10966
+1-FH,1-FH,1,FH,Raw,Forehead,Sebaceous,43.68,33,F,white,water,1,natural,daily,0.5,bar_soap,0,none,7,cat,3,0,0,NA,374,2568
+1-FH-PMA,1-FH-PMA,1,FH,PMA,Forehead,Sebaceous,43.68,33,F,white,water,1,natural,daily,0.5,bar_soap,0,none,7,cat,3,0,0,NA,351,2413
+1-UB,1-UB,1,UB,Raw,Upper_back,Sebaceous,63.05,33,F,white,water,1,natural,daily,0.5,bar_soap,0,none,7,cat,3,0,0,NA,25847,122981
+1-UB-PMA,1-UB-PMA,1,UB,PMA,Upper_back,Sebaceous,63.05,33,F,white,water,1,natural,daily,0.5,bar_soap,0,none,7,cat,3,0,0,NA,11653,55447
+2-AC,2-AC,2,AC,Raw,Antecubital_crease,Moist,35,34,F,latino,makeup remover+water+soap+lotion,2,industrial,no,1,bar_soap,2,industrial,4,none,0,0,0,NA,36,310
+2-AC-PMA,2-AC-PMA,2,AC,PMA,Antecubital_crease,Moist,35,34,F,latino,makeup remover+water+soap+lotion,2,industrial,no,1,bar_soap,2,industrial,4,none,0,0,0,NA,3,25
+2-FH,2-FH,2,FH,Raw,Forehead,Sebaceous,43.68,34,F,latino,makeup remover+water+soap+lotion,2,industrial,no,1,bar_soap,2,industrial,4,none,0,0,0,NA,1857,12754
+2-FH-PMA,2-FH-PMA,2,FH,PMA,Forehead,Sebaceous,43.68,34,F,latino,makeup remover+water+soap+lotion,2,industrial,no,1,bar_soap,2,industrial,4,none,0,0,0,NA,1629,11188
+2-PC,2-PC,2,PC,Raw,Popliteal_crease,Moist,50.63,34,F,latino,makeup remover+water+soap+lotion,2,industrial,no,1,bar_soap,2,industrial,4,none,0,0,0,NA,180,1069
+2-PC-PMA,2-PC-PMA,2,PC,PMA,Popliteal_crease,Moist,50.63,34,F,latino,makeup remover+water+soap+lotion,2,industrial,no,1,bar_soap,2,industrial,4,none,0,0,0,NA,10133,60043
+2-UB,2-UB,2,UB,Raw,Upper_back,Sebaceous,63.05,34,F,latino,makeup remover+water+soap+lotion,2,industrial,no,1,bar_soap,2,industrial,4,none,0,0,0,NA,276,1311
+2-UB-PMA,2-UB-PMA,2,UB,PMA,Upper_back,Sebaceous,63.05,34,F,latino,makeup remover+water+soap+lotion,2,industrial,no,1,bar_soap,2,industrial,4,none,0,0,0,NA,120,570
+3-Abd,3-Abd,3,Abd,Raw,Abdomen,Dry,50.41,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,NA,397,2362
+3-Abd-PMA,3-Abd-PMA,3,Abd,PMA,Abdomen,Dry,50.41,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,NA,8474,50430
+3-AC,3-AC,3,AC,Raw,Antecubital_crease,Moist,35,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,no bacteria or bead detected in FC,#DIV/0!,#VALUE!
+3-AC-PMA,3-AC-PMA,3,AC,PMA,Antecubital_crease,Moist,35,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,no bacteria or bead detected in FC,#DIV/0!,#VALUE!
+3-FH,3-FH,3,FH,Raw,Forehead,Sebaceous,43.68,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,NA,27918,191743
+3-FH-PMA,3-FH-PMA,3,FH,PMA,Forehead,Sebaceous,43.68,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,NA,31957,219486
+3-PC,3-PC,3,PC,Raw,Popliteal_crease,Moist,50.63,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,NA,164,972
+3-PC-PMA,3-PC-PMA,3,PC,PMA,Popliteal_crease,Moist,50.63,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,NA,22,131
+3-UB,3-UB,3,UB,Raw,Upper_back,Sebaceous,63.05,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,NA,27055,128730
+3-UB-PMA,3-UB-PMA,3,UB,PMA,Upper_back,Sebaceous,63.05,33,M,indian,water,1,industrial,daily,1,showergel,1,industrial,3,none,0,0,0,NA,17786,84630
+4-AC,4-AC,4,AC,Raw,Antecubital_crease,Moist,35,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,454,3889
+4-AC-PMA,4-AC-PMA,4,AC,PMA,Antecubital_crease,Moist,35,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,28,237
+4-FA,4-FA,4,FA,Raw,Forearm,Dry,51.3,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,384,2248
+4-FA-PMA,4-FA-PMA,4,FA,PMA,Forearm,Dry,51.3,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,9,50
+4-FH,4-FH,4,FH,Raw,Forehead,Sebaceous,43.68,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,7847,53896
+4-FH-PMA,4-FH-PMA,4,FH,PMA,Forehead,Sebaceous,43.68,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,9958,68395
+4-PC,4-PC,4,PC,Raw,Popliteal_crease,Moist,50.63,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,179,1061
+4-PC-PMA,4-PC-PMA,4,PC,PMA,Popliteal_crease,Moist,50.63,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,18,106
+4-UB,4-UB,4,UB,Raw,Upper_back,Sebaceous,63.05,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,34593,164598
+4-UB-PMA,4-UB-PMA,4,UB,PMA,Upper_back,Sebaceous,63.05,29,M,white,soap,0.5,natural,3x/week,1,bar_soap,0,none,7,none,3,0,0,NA,21816,103805
+5-AC,5-AC,5,AC,Raw,Antecubital_crease,Moist,35,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,1222,10478
+5-AC-PMA,5-AC-PMA,5,AC,PMA,Antecubital_crease,Moist,35,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,578,4952
+5-FA,5-FA,5,FA,Raw,Forearm,Dry,51.3,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,817,4776
+5-FA-PMA,5-FA-PMA,5,FA,PMA,Forearm,Dry,51.3,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,279,1632
+5-FH,5-FH,5,FH,Raw,Forehead,Sebaceous,43.68,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,3622,24874
+5-FH-PMA,5-FH-PMA,5,FH,PMA,Forehead,Sebaceous,43.68,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,19040,130766
+5-PC,5-PC,5,PC,Raw,Popliteal_crease,Moist,50.63,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,394,2333
+5-PC-PMA,5-PC-PMA,5,PC,PMA,Popliteal_crease,Moist,50.63,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,67,400
+5-UB,5-UB,5,UB,Raw,Upper_back,Sebaceous,63.05,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,3934,18719
+5-UB-PMA,5-UB-PMA,5,UB,PMA,Upper_back,Sebaceous,63.05,28,F,white,soap,0,none,3x/week,1.5,bar_soap,0,none,10,none,2,2,0,NA,3000,14275
+6-AC,6-AC,6,AC,Raw,Antecubital_crease,Moist,35,23,M,indian,soap,0,none,no,1,showergel,0,none,4,cat,0,0,0,NA,290,2484
+6-AC-PMA,6-AC-PMA,6,AC,PMA,Antecubital_crease,Moist,35,23,M,indian,soap,0,none,no,1,showergel,0,none,4,cat,0,0,0,NA,37,313
+6-FH,6-FH,6,FH,Raw,Forehead,Sebaceous,43.68,23,M,indian,soap,0,none,no,1,showergel,0,none,4,cat,0,0,0,NA,188,1293
+6-FH-PMA,6-FH-PMA,6,FH,PMA,Forehead,Sebaceous,43.68,23,M,indian,soap,0,none,no,1,showergel,0,none,4,cat,0,0,0,NA,80,552
+6-PC,6-PC,6,PC,Raw,Popliteal_crease,Moist,50.63,23,M,indian,soap,0,none,no,1,showergel,0,none,4,cat,0,0,0,NA,183,1083
+6-PC-PMA,6-PC-PMA,6,PC,PMA,Popliteal_crease,Moist,50.63,23,M,indian,soap,0,none,no,1,showergel,0,none,4,cat,0,0,0,NA,19,111
+6-UB,6-UB,6,UB,Raw,Upper_back,Sebaceous,63.05,23,M,indian,soap,0,none,no,1,showergel,0,none,4,cat,0,0,0,NA,1229,5850
+6-UB-PMA,6-UB-PMA,6,UB,PMA,Upper_back,Sebaceous,63.05,23,M,indian,soap,0,none,no,1,showergel,0,none,4,cat,0,0,0,NA,341,1624
+7-FA,7-FA,7,FA,Raw,Forearm,Dry,51.3,34,F,latino,soap+lotion,1,industrial,daily,2,bar_soap,2,industrial,5,none,2,2,0,NA,237,1384
+7-FA-PMA,7-FA-PMA,7,FA,PMA,Forearm,Dry,51.3,34,F,latino,soap+lotion,1,industrial,daily,2,bar_soap,2,industrial,5,none,2,2,0,NA,45,262
+7-FH,7-FH,7,FH,Raw,Forehead,Sebaceous,43.68,34,F,latino,soap+lotion,1,industrial,daily,2,bar_soap,2,industrial,5,none,2,2,0,NA,8886,61031
+7-FH-PMA,7-FH-PMA,7,FH,PMA,Forehead,Sebaceous,43.68,34,F,latino,soap+lotion,1,industrial,daily,2,bar_soap,2,industrial,5,none,2,2,0,NA,7356,50519
+7-PC,7-PC,7,PC,Raw,Popliteal_crease,Moist,50.63,34,F,latino,soap+lotion,1,industrial,daily,2,bar_soap,2,industrial,5,none,2,2,0,NA,158,938
+7-PC-PMA,7-PC-PMA,7,PC,PMA,Popliteal_crease,Moist,50.63,34,F,latino,soap+lotion,1,industrial,daily,2,bar_soap,2,industrial,5,none,2,2,0,NA,32,190
+7-UB,7-UB,7,UB,Raw,Upper_back,Sebaceous,63.05,34,F,latino,soap+lotion,1,industrial,daily,2,bar_soap,2,industrial,5,none,2,2,0,NA,5902,28082
+7-UB-PMA,7-UB-PMA,7,UB,PMA,Upper_back,Sebaceous,63.05,34,F,latino,soap+lotion,1,industrial,daily,2,bar_soap,2,industrial,5,none,2,2,0,NA,1934,9200
+8-Abd,8-Abd,8,Abd,Raw,Abdomen,Dry,50.41,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,47,280
+8-Abd-PMA,8-Abd-PMA,8,Abd,PMA,Abdomen,Dry,50.41,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,2,12
+8-AC,8-AC,8,AC,Raw,Antecubital_crease,Moist,35,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,402,3446
+8-AC-PMA,8-AC-PMA,8,AC,PMA,Antecubital_crease,Moist,35,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,3,22
+8-FA,8-FA,8,FA,Raw,Forearm,Dry,51.3,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,126,736
+8-FA-PMA,8-FA-PMA,8,FA,PMA,Forearm,Dry,51.3,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,4,22
+8-FH,8-FH,8,FH,Raw,Forehead,Sebaceous,43.68,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,147,1009
+8-FH-PMA,8-FH-PMA,8,FH,PMA,Forehead,Sebaceous,43.68,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,70,480
+8-PC,8-PC,8,PC,Raw,Popliteal_crease,Moist,50.63,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,217,1288
+8-PC-PMA,8-PC-PMA,8,PC,PMA,Popliteal_crease,Moist,50.63,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,2,9
+8-UB,8-UB,8,UB,Raw,Upper_back,Sebaceous,63.05,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,230,1092
+8-UB-PMA,8-UB-PMA,8,UB,PMA,Upper_back,Sebaceous,63.05,29,F,white,soap,2,natural,no,1,bar_soap,0.5,industrial/natural,1,none,0,0,0,3_months_pregnant,10,49
+9-AC,9-AC,9,AC,Raw,Antecubital_crease,Moist,35,37,M,indian,water,0.5,industrial,no,1.5,showergel,0,none,7,none,0,0,0,NA,61,520
+9-AC-PMA,9-AC-PMA,9,AC,PMA,Antecubital_crease,Moist,35,37,M,indian,water,0.5,industrial,no,1.5,showergel,0,none,7,none,0,0,0,NA,1,9
+9-FH,9-FH,9,FH,Raw,Forehead,Sebaceous,43.68,37,M,indian,water,0.5,industrial,no,1.5,showergel,0,none,7,none,0,0,0,NA,5121,35173
+9-FH-PMA,9-FH-PMA,9,FH,PMA,Forehead,Sebaceous,43.68,37,M,indian,water,0.5,industrial,no,1.5,showergel,0,none,7,none,0,0,0,NA,3273,22480
+9-PC,9-PC,9,PC,Raw,Popliteal_crease,Moist,50.63,37,M,indian,water,0.5,industrial,no,1.5,showergel,0,none,7,none,0,0,0,NA,111,659
+9-PC-PMA,9-PC-PMA,9,PC,PMA,Popliteal_crease,Moist,50.63,37,M,indian,water,0.5,industrial,no,1.5,showergel,0,none,7,none,0,0,0,NA,1,6
+10-Abd,10-Abd,10,Abd,Raw,Abdomen,Dry,50.41,52,M,white,water,0,none,no,1,showergel,0,none,2,dog,0,1,0,NA,11,67
+10-Abd-PMA,10-Abd-PMA,10,Abd,PMA,Abdomen,Dry,50.41,52,M,white,water,0,none,no,1,showergel,0,none,2,dog,0,1,0,NA,1,3
+10-FA,10-FA,10,FA,Raw,Forearm,Dry,51.3,52,M,white,water,0,none,no,1,showergel,0,none,2,dog,0,1,0,NA,94,551
+10-FA-PMA,10-FA-PMA,10,FA,PMA,Forearm,Dry,51.3,52,M,white,water,0,none,no,1,showergel,0,none,2,dog,0,1,0,NA,0,2
+10-FH,10-FH,10,FH,Raw,Forehead,Sebaceous,43.68,52,M,white,water,0,none,no,1,showergel,0,none,2,dog,0,1,0,NA,109,748
+10-FH-PMA,10-FH-PMA,10,FH,PMA,Forehead,Sebaceous,43.68,52,M,white,water,0,none,no,1,showergel,0,none,2,dog,0,1,0,NA,125,857
+10-UB,10-UB,10,UB,Raw,Upper_back,Sebaceous,63.05,52,M,white,water,0,none,no,1,showergel,0,none,2,dog,0,1,0,NA,570,2713
+10-UB-PMA,10-UB-PMA,10,UB,PMA,Upper_back,Sebaceous,63.05,52,M,white,water,0,none,no,1,showergel,0,none,2,dog,0,1,0,NA,300,1428
+11-AC,11-AC,11,AC,Raw,Antecubital_crease,Moist,35,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,537,4603
+11-AC-PMA,11-AC-PMA,11,AC,PMA,Antecubital_crease,Moist,35,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,158,1358
+11-FA,11-FA,11,FA,Raw,Forearm,Dry,51.3,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,254,1485
+11-FA-PMA,11-FA-PMA,11,FA,PMA,Forearm,Dry,51.3,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,16,95
+11-FH,11-FH,11,FH,Raw,Forehead,Sebaceous,43.68,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,4541,31187
+11-FH-PMA,11-FH-PMA,11,FH,PMA,Forehead,Sebaceous,43.68,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,5482,37650
+11-PC,11-PC,11,PC,Raw,Popliteal_crease,Moist,50.63,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,257,1523
+11-PC-PMA,11-PC-PMA,11,PC,PMA,Popliteal_crease,Moist,50.63,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,10,61
+11-UB,11-UB,11,UB,Raw,Upper_back,Sebaceous,63.05,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,7598,36154
+11-UB-PMA,11-UB-PMA,11,UB,PMA,Upper_back,Sebaceous,63.05,20,F,asian,makeup remover+water+soap+lotion,1,industrial,no,1,bar_soap,1,industrial,3,none,0,0,0,daily_acne_spa_treatment_face,5562,26466
