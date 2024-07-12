@@ -1,0 +1,232 @@
+---
+title: "RPCA_plotting_Fig2"
+author: "Deepan"
+date: "7/11/2024"
+output: html_document
+---
+
+#Plotting the RPCA ordinations produced on QIIME2 using ggplot2
+
+##All samples
+```{r}
+
+rpca_all <- read.delim("taxa_all_ordination_coords.csv", header = TRUE, sep = ",", check.names = FALSE)[,-4] #only plotting PC1 and PC2. 
+
+rpca_all$Treatment <- ifelse(str_detect(rpca_all$Sample, "PMA"), "PMA", "Raw")
+
+ggplot(rpca_all, aes(x = PC1, y = PC2, fill = Treatment)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = c("moccasin", "tomato4")) +
+  labs(x = "PC1 (58.07%)", y = "PC2 (36.75%)") +
+  theme_pca()
+
+```
+
+#Raw samples
+```{r}
+
+rpca_nopma <- read.delim("taxa_no_pma_ordination_coords.csv", header = TRUE, sep = ",", check.names = FALSE)[,-4] #only plotting PC1 and PC2. 
+
+rpca_nopma$Skin_Type <- ifelse(str_detect(rpca_nopma$Sample, "Abd|FA"), "Dry (n=10)",
+                         ifelse(str_detect(rpca_nopma$Sample, "AC|PC"), "Moist (n=18)", "Sebaceous (n=21)"))
+
+rpca_nopma$Indiv <- str_split(rpca_nopma$Sample, "-", simplify = TRUE)[,1]
+
+ggplot(rpca_nopma, aes(x = PC1, y = PC2, fill = Skin_Type)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  labs(x = "PC1 (55.77%)", y = "PC2 (35.19%)") +
+  theme_pca()
+
+ggplot(rpca_nopma, aes(x = PC1, y = PC2, fill = Indiv)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = indiv_colors) +
+  labs(x = "PC1 (55.77%)", y = "PC2 (35.19%)") +
+  theme_pca()
+
+```
+
+#PMA treated samples
+```{r}
+
+rpca_pma <- read.delim("taxa_pma_ordination_coords.csv", header = TRUE, sep = ",", check.names = FALSE)[,-4] #only plotting PC1 and PC2. 
+
+rpca_pma$Skin_Type <- ifelse(str_detect(rpca_pma$Sample, "Abd|FA"), "Dry (n=10)",
+                         ifelse(str_detect(rpca_pma$Sample, "AC|PC"), "Moist (n=18)", "Sebaceous (n=21)"))
+
+rpca_pma$Indiv <- str_split(rpca_pma$Sample, "-", simplify = TRUE)[,1]
+
+ggplot(rpca_pma, aes(x = PC1, y = PC2, fill = Skin_Type)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  labs(x = "PC1 (55.10%)", y = "PC2 (40.00%)") +
+  theme_pca()
+
+ggplot(rpca_pma, aes(x = PC1, y = PC2, fill = Indiv)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = indiv_colors) +
+  labs(x = "PC1 (55.10%)", y = "PC2 (40.00%)") +
+  theme_pca()
+
+```
+
+#Computing distances between samples in Raw vs PMA treated, grouped by Individuals or Skin site type using the RPCA distance matrices generated on QIIME2
+
+```{r, fig.height=4, fig.width=4}
+
+distances_nopma <- read.table("taxa_nopma_distance.tsv", header = TRUE, row.names = 1, sep = "\t", check.names = FALSE)
+distances_pma <- read.table("taxa_pma_distance.tsv", header = TRUE, row.names = 1, sep = "\t", check.names = FALSE)
+
+```
+
+## from untreated (Raw) samples
+
+```{r}
+
+distances_nopma$Sample <- rownames(distances_nopma)
+df <- melt(distances_nopma)
+
+#a) distance between samples from same individual 
+
+df_ind <-df
+df_ind$Indiv <- str_split(df_ind$Sample, "-", simplify = TRUE)[,1]
+df_ind$Indiv2 <- str_split(df_ind$variable, "-", simplify = TRUE)[,1]
+
+#only keep distances computed between samples from same individual
+df_ind$Ind <- df_ind$Indiv
+df_ind$Ind[df_ind$Indiv != df_ind$Indiv2] <- "none"
+df_ind <- df_ind [ df_ind$Ind != "none", !colnames(df_ind) %in% c("Indiv", "Indiv2") ]
+df_ind$Ind <- as.integer(df_ind$Ind)
+df_ind$Sample <- paste(df_ind$Sample, df_ind$variable, sep = "_")
+
+avg_ind <- df_ind[,c(1,3,4)]
+
+
+#b) distance between samples from same skin type site 
+
+df_ST <-df
+df_ST$Skin_Type <- str_split(df_ST$Sample, "-", simplify = TRUE)[,2]
+
+#only keep distances computed between samples from same skin type sites
+df_ST$Skin_Type <- ifelse(str_detect(df_ST$Sample, "AC|PC") & str_detect(df_ST$variable, "AC|PC"), "Moist (n=18)", 
+                          ifelse(str_detect(df_ST$Sample, "FA|Abd") & str_detect(df_ST$variable, "FA|Abd"), "Dry (n=10)",
+                                 ifelse(str_detect(df_ST$Sample, "FH|UB") & str_detect(df_ST$variable, "FH|UB"), "Sebaceous (n=21)", "none")))
+df_ST <- df_ST[df_ST$Skin_Type != "none",]
+df_ST$Skin_Type <- ordered(df_ST$Skin_Type, levels = c("Sebaceous (n=20)", "Moist (n=16)", "Dry (n=8)"))
+df_ST <-df_ST[order(df_ST$Skin_Type),]
+df_ST$Sample <- paste(df_ST$Sample, df_ST$variable, sep = "_")
+
+avg_SkinType <- df_ST[,c(1,3,4)]
+
+```
+
+## from PMA-treated samples
+
+```{r}
+
+distances_pma$Sample <- rownames(distances_pma)
+df <- melt(distances_pma)
+
+#a) distance between samples from same individual 
+
+df_ind <-df
+df_ind$Indiv <- str_split(df_ind$Sample, "-", simplify = TRUE)[,1]
+df_ind$Indiv2 <- str_split(df_ind$variable, "-", simplify = TRUE)[,1]
+
+#only keep distances computed between samples from same individual
+df_ind$Ind <- df_ind$Indiv
+df_ind$Ind[df_ind$Indiv != df_ind$Indiv2] <- "none"
+df_ind <- df_ind [ df_ind$Ind != "none", !colnames(df_ind) %in% c("Indiv", "Indiv2") ]
+df_ind$Ind <- as.integer(df_ind$Ind)
+df_ind$Sample <- paste(df_ind$Sample, df_ind$variable, sep = "_")
+df_ind$Sample <- str_replace_all(df_ind$Sample, "-PMA", "")
+
+avg_ind <- merge(avg_ind, df_ind[, c(1,3)], by = "Sample")
+
+colnames(avg_ind) <- c("Sample", "Raw", "Ind", "PMA")
+
+avg_ind$Ind <- sapply(avg_ind$Ind, as.character)
+
+#b) distance between samples from same skin type site 
+
+df_ST <-df
+df_ST$Skin_Type <- str_split(df_ST$Sample, "-", simplify = TRUE)[,2]
+
+#only keep distances computed between samples from same skin type sites
+df_ST$Skin_Type <- ifelse(str_detect(df_ST$Sample, "AC|PC") & str_detect(df_ST$variable, "AC|PC"), "Moist (n=18)", 
+                          ifelse(str_detect(df_ST$Sample, "FA|Abd") & str_detect(df_ST$variable, "FA|Abd"), "Dry (n=10)",
+                                 ifelse(str_detect(df_ST$Sample, "FH|UB") & str_detect(df_ST$variable, "FH|UB"), "Sebaceous (n=21)", "none")))
+df_ST <- df_ST[df_ST$Skin_Type != "none",]
+df_ST$Skin_Type <- ordered(df_ST$Skin_Type, levels = c("Sebaceous (n=20)", "Moist (n=16)", "Dry (n=8)"))
+df_ST <-df_ST[order(df_ST$Skin_Type),]
+df_ST$Sample <- paste(df_ST$Sample, df_ST$variable, sep = "_")
+df_ST$Sample <- str_replace_all(df_ST$Sample, "-PMA", "")
+
+avg_SkinType <- merge(avg_SkinType, df_ST[, c(1,3)], by = "Sample")
+
+colnames(avg_SkinType) <- c("Sample", "Raw", "Skin_Type", "PMA")
+
+```
+
+## computing wilcox pairwise test with fdr correction (# of comparisions > 50) for distances between samples from the same Skin Type in Raw vs PMA treated samples
+
+```{r}
+
+wilcox_result <- wilcox.test(avg_SkinType$PMA, avg_SkinType$Raw, paired = TRUE)
+  n_comparisons <- nrow(avg_SkinType)
+  adjusted_p_values <- p.adjust(wilcox_result$p.value, method = "fdr", n = n_comparisons)
+
+results_SkinType <- data.frame(group1 = "PMA", group2 = "Raw", p_val = as.double(adjusted_p_values), y.position = 1.8)
+results_SkinType$p.adj <- sapply(results_SkinType$p_val, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) 
+
+```
+
+##plotting
+
+```{r}
+
+ggplot(melt(avg_SkinType), aes(x = variable, y = value)) + 
+  geom_boxplot(aes(fill = variable), width = 0.5, lwd = 1, fatten = TRUE) +
+  stat_pvalue_manual(results_SkinType, label = "p_val", y.position = 5) +
+   scale_fill_manual(values = c("Raw" = "tomato4", "PMA" = "moccasin")) +
+  labs(title = "distance between samples from same Skin Type") +
+  theme_pca()
+
+```  
+
+## computing wilcox pairwise with fdr correction (# of comparisions > 50) for distances between samples from the same Individual in Raw vs PMA treated samples
+
+```{r}
+
+wilcox_result <- wilcox.test(avg_ind$PMA, avg_ind$Raw, paired = TRUE)
+  n_comparisons <- nrow(avg_ind)
+  adjusted_p_values <- p.adjust(wilcox_result$p.value, method = "fdr", n = n_comparisons)
+
+results_Indiv <- data.frame(group1 = "PMA", group2 = "Raw", p_val = as.double(adjusted_p_values), y.position = 1.8)
+results_Indiv$p.adj <- sapply(results_Indiv$p_val, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) 
+
+```
+
+##plotting
+
+```{r}
+
+ggplot(melt(avg_ind), aes(x = variable, y = value)) + 
+  geom_boxplot(aes(fill = variable), width = 0.5, lwd = 1, fatten = TRUE) +
+  stat_pvalue_manual(results_Indiv, label = "p_val", y.position = 5) +
+   scale_fill_manual(values = c("Raw" = "tomato4", "PMA" = "moccasin")) +
+  labs(title = "distance between samples from same Individual") +
+  theme_pca()
+
+```
+

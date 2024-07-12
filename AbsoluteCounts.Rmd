@@ -1,0 +1,186 @@
+---
+title: "AsboluteCounts_Fig3"
+author: "Deepan"
+date: "7/11/2024"
+output: html_document
+---
+
+```{r}
+
+data_length <- read.table("Final_genomelengthnormalized_topspec_relative.tsv",
+                    sep="\t", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    row.names = 1,
+                    na.strings = "",
+                    check.names = FALSE, 
+                    comment.char = "")
+
+counts <- read.table("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/BIOM_files/ZebraFilter/Final_CellCounts.tsv",
+                    sep="\t", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    row.names = 1,
+                    na.strings = "",
+                    check.names = FALSE, 
+                    comment.char = "")
+
+#set custom order for samples to be maintained throughout script
+
+counts$Sample <- ordered(counts$Sample, levels = sample_order)
+counts <- counts[order(counts$Sample),]
+
+#create a live percent column for the samples. 
+counts$percent_live <- 100 * (counts$PMA / counts$Raw)
+```
+
+
+#pairwise wilcox test 
+
+```{r}
+
+#1. all samples
+wilcox_result <- wilcox.test(counts$PMA, counts$Raw, paired = TRUE)
+adjusted_p_values <- ifelse (nrow(group_subset) <= 100, wilcox_result$p.value, p.adjust(wilcox_result$p.value, method = "bonferroni", n = n_comparisons)) #pvalue correction
+wilcox_result$p.value <- scientific(adjusted_p_values, digits = 3)
+results_Treatment <- data.frame(group1 = "PMA", group2 = "Raw", Corrected_pval = as.double(wilcox_result$p.value), y.position = 6)
+results_Treatment$N <- nrow(counts)
+results_Treatment$p.adj <- results_Treatment$Corrected_pval
+results_Treatment$p.adj <- sapply(results_Treatment$Corrected_pval, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+
+
+#2. grouped by body part
+
+grouped_data <- counts %>%
+  group_by(Body_Part)
+results_BPart <- data.frame()
+
+#loop through all samples in the same bodypart
+
+for (group_name in unique(grouped_data$Body_Part)) {
+  group_subset <- grouped_data %>% filter(Body_Part == group_name)
+  wilcox_result <- wilcox.test(group_subset$PMA, group_subset$Raw, paired = TRUE)
+  n_comparisons <- nrow(group_subset)
+  adjusted_p_values <- ifelse (nrow(group_subset) <= 100, wilcox_result$p.value, p.adjust(wilcox_result$p.value, method = "bonferroni", n = n_comparisons))
+
+  result_row <- data.frame(
+  Group = group_name,
+  Body_Part = group_name,
+    N = n_comparisons,
+    PValue = wilcox_result$p.value,
+    CorrectedPValue = adjusted_p_values
+  )
+  results_BPart <- rbind(results_BPart, result_row)
+}
+results_BPart$group1 <- c(rep("PMA", nrow(results_BPart)))
+results_BPart$group2 <- c(rep("Raw", nrow(results_BPart)))
+# results_BPart$`y.position` <- c(rep(9, nrow(results_BPart)))
+results_BPart$`p.adj` <- results_BPart$CorrectedPValue
+results_BPart$p.adj <- sapply(results_BPart$p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+
+
+#3. grouped by skin site (skin type)
+
+grouped_data <- counts %>%
+  group_by(Skin_Type)
+results_SType <- data.frame()
+
+#loop through all samples in the same bodypart
+
+for (group_name in unique(grouped_data$Skin_Type)) {
+  group_subset <- grouped_data %>% filter(Skin_Type == group_name)
+  wilcox_result <- wilcox.test(group_subset$PMA, group_subset$Raw, paired = TRUE)
+  n_comparisons <- nrow(group_subset)
+  adjusted_p_values <- ifelse (nrow(group_subset) <= 100, wilcox_result$p.value, p.adjust(wilcox_result$p.value, method = "BY", n = n_comparisons))
+
+  result_row <- data.frame(
+  Group = group_name,
+  Skin_Type = group_name,
+    N = n_comparisons,
+    PValue = wilcox_result$p.value,
+    CorrectedPValue = adjusted_p_values
+  )
+  results_SType <- rbind(results_SType, result_row)
+}
+results_SType$group1 <- c(rep("PMA", nrow(results_SType)))
+results_SType$group2 <- c(rep("Raw", nrow(results_SType)))
+# results_SType$`y.position` <- c(rep(9, nrow(results_SType)))
+results_SType$`p.adj` <- results_SType$CorrectedPValue
+results_SType$p.adj <- sapply(results_SType$p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+
+
+#4. by individual
+
+grouped_data <- counts %>%
+  group_by(Indiv)
+results_Indiv <- data.frame()
+
+#loop through all samples in the same bodypart
+
+for (group_name in unique(grouped_data$Indiv)) {
+  group_subset <- grouped_data %>% filter(Indiv == group_name)
+  wilcox_result <- wilcox.test(group_subset$PMA, group_subset$Raw, paired = TRUE)
+  n_comparisons <- nrow(group_subset)
+  adjusted_p_values <- ifelse (nrow(group_subset) <= 100, wilcox_result$p.value, p.adjust(wilcox_result$p.value, method = "bonferroni", n = n_comparisons))
+
+  result_row <- data.frame(
+  Group = group_name,
+  Indiv = group_name,
+    N = n_comparisons,
+    PValue = wilcox_result$p.value,
+    CorrectedPValue = adjusted_p_values
+  )
+  results_Indiv <- rbind(results_Indiv, result_row)
+}
+results_Indiv$group1 <- c(rep("PMA", nrow(results_Indiv)))
+results_Indiv$group2 <- c(rep("Raw", nrow(results_Indiv)))
+# results_Indiv$`y.position` <- c(rep(9, nrow(results_Indiv)))
+results_Indiv$`p.adj` <- results_Indiv$CorrectedPValue
+results_Indiv$p.adj <- sapply(results_Indiv$p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+
+```
+
+#Total cell counts
+
+```{r}
+temp <- melt(counts[, !colnames(counts) %in% c("dead", "percent_dead", "frac_liv", "percent_live")])
+colnames(temp)[5:6] <- c("Treatment", "Count")
+
+#set levels for uniform order in plots
+temp$Treatment <- factor(temp$Treatment, levels = c("Raw", "PMA"))
+temp$Skin_Type <- factor(temp$Skin_Type, levels = c("Sebaceous (n=20)", "Moist (n=16)", "Dry (n=8)"))
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Sebaceous (n=20)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Sebaceous (n=20)"]))
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Moist (n=16)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Moist (n=16)"]))
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Dry (n=8)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Dry (n=8)"]))
+
+
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Body_Part == "Forehead (n=10)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Body_Part == "Forehead (n=10)"]))
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Body_Part == "Upper Back (n=10)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Body_Part == "Upper Back (n=10)"]))
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Body_Part == "Antecubital Crease (n=8)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Body_Part == "Antecubital Crease (n=8)"]))
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Body_Part == "Popliteal Crease (n=8)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Body_Part == "Popliteal Crease (n=8)"]))
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Body_Part == "Forearm (n=6)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Body_Part == "Forearm (n=6)"]))
+
+scientific(mean(temp$Count[temp$Treatment == "Raw" & temp$Body_Part == "Abdomen (n=2)"]))
+scientific(mean(temp$Count[temp$Treatment == "PMA" & temp$Body_Part == "Abdomen (n=2)"]))
+
+```
+
+

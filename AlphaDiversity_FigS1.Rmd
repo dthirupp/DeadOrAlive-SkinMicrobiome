@@ -1,0 +1,174 @@
+---
+title: "AlphaDiversity_FigS1"
+author: "Deepan"
+date: "7/11/2024"
+output: html_document
+---
+
+###### getting the OGU (Operational Genomic Unit feature table) and obtaining alpha diversity metrics using phyloseq Paul J. McMurdie and Susan Holmes (2013) package
+```{r}
+
+data_ogu<- read.table("ogu_25percent_table.tsv", 
+                    sep=",", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE, 
+                    na.strings = NA, 
+                    check.names = FALSE, 
+                    row.names = 1,
+                    comment.char = "") #bis and 1 averaged and fixed on excel for this file
+
+
+data_ogu <- as.matrix(data_ogu)
+
+data_ogu <- phyloseq(otu_table(data_ogu, taxa_are_rows = TRUE), sample_data(metadata))
+data_ogu <- transform_sample_counts(data_ogu, as.integer)
+
+alpha <- estimate_richness(data_ogu , split = TRUE, measures = NULL)
+
+alpha$Sample <- rownames(alpha)
+alpha$Sample <- str_replace(alpha$Sample, "X", "")
+alpha$Sample <- str_replace_all(alpha$Sample, "\\.", "-")
+
+alpha <- merge(alpha, metadata, by = "Sample")
+
+```
+
+###### getting pairwise shannon diversity and simpson evenness for raw and PMA treated samples wilcox significance. 
+
+```{r}
+
+#1. Make appropriate df
+
+wilc <- alpha[!str_detect(alpha$Sample, "-PMA"), colnames(alpha) %in% c("Sample", "Shannon", "Simpson", "Skin_Type", "Body_Part")]
+colnames(wilc)[2:3] <- c("Shannon_Raw", "Simpson_Raw")
+
+wilc_pma <- alpha[str_detect(alpha$Sample, "-PMA"), colnames(alpha) %in% c("Sample", "Shannon", "Simpson", "Skin_Type", "Body_Part")]
+wilc_pma$Sample <-str_replace(wilc_pma$Sample, "-PMA", "")
+colnames(wilc_pma)[2:3] <- c("Shannon_PMA", "Simpson_PMA")
+
+wilc <- merge(wilc, wilc_pma[,c(1,2,3)], by = "Sample")
+
+
+#1. overall
+wilcox_result_shannon <- wilcox.test(wilc$Shannon_PMA, wilc$Shannon_Raw, paired = TRUE)
+adjusted_p_values <- ifelse (nrow(group_subset) <= 10, wilcox_result_shannon$p.value, p.adjust(wilcox_result_shannon$p.value, method = "bonferroni", n = n_comparisons))
+wilcox_result_shannon$p.value <- scientific(adjusted_p_values, digits = 3)
+
+wilcox_result_simpson <- wilcox.test(wilc$Simpson_PMA, wilc$Simpson_Raw, paired = TRUE)
+adjusted_p_values <- ifelse (nrow(group_subset) <= 10, wilcox_result_simpson$p.value, p.adjust(wilcox_result_simpson$p.value, method = "bonferroni", n = n_comparisons))
+wilcox_result_simpson$p.value <- scientific(adjusted_p_values, digits = 3)
+
+results_Treatment <- data.frame(group1 = "PMA", group2 = "Raw", Shannon_Corrected_pval = as.double(wilcox_result_shannon$p.value), Simpson_Corrected_pval = as.double(wilcox_result_simpson$p.value), y.position = 6)
+results_Treatment$N <- nrow(wilc)
+results_Treatment$Shannon_p.adj <- results_Treatment$Shannon_Corrected_pval
+results_Treatment$Shannon_p.adj <- sapply(results_Treatment$Shannon_p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+results_Treatment$Simpson_p.adj <- results_Treatment$Simpson_Corrected_pval
+results_Treatment$Simpson_p.adj <- sapply(results_Treatment$Simpson_p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+
+#2. for Skin_Type
+
+grouped_data <- wilc %>%
+  group_by(Skin_Type)
+results_SkinType <- data.frame()
+
+for (group_name in unique(grouped_data$Skin_Type)) {
+  group_subset <- grouped_data %>% filter(Skin_Type == group_name)
+  wilcox_result_shannon <- wilcox.test(group_subset$Shannon_PMA, group_subset$Shannon_Raw, paired = TRUE)
+  wilcox_result_simpson <- wilcox.test(group_subset$Simpson_PMA, group_subset$Simpson_Raw, paired = TRUE)
+  n_comparisons <- nrow(group_subset)
+  adjusted_p_values_shannon <- ifelse (nrow(group_subset) <= 10, wilcox_result_shannon$p.value, p.adjust(wilcox_result_shannon$p.value, method = "bonferroni", n = n_comparisons))
+  adjusted_p_values_simpson <- ifelse (nrow(group_subset) <= 10, wilcox_result_simpson$p.value, p.adjust(wilcox_result_simpson$p.value, method = "bonferroni", n = n_comparisons))
+
+  result_row <- data.frame(
+    Skin_Type = paste(group_name, " (n=", n_comparisons, ")", sep =""),
+    Sample = group_name,
+    N = n_comparisons,
+    Shannon_PValue = wilcox_result_shannon$p.value,
+    Simpson_PValue = wilcox_result_simpson$p.value,
+    Shannon_CorrectedPValue = adjusted_p_values_shannon,
+    Simpson_CorrectedPValue = adjusted_p_values_simpson,
+    group1 = "PMA",
+    group2 = "Raw"
+  )
+  results_SkinType <- rbind(results_SkinType, result_row)
+}
+
+
+results_SkinType$Shannon_p.adj <- results_SkinType$Shannon_CorrectedPValue
+results_SkinType$Shannon_p.adj <- sapply(results_SkinType$Shannon_p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+
+results_SkinType$Simpson_p.adj <- results_SkinType$Simpson_CorrectedPValue
+results_SkinType$Simpson_p.adj <- sapply(results_SkinType$Simpson_p.adj, function (x) ifelse(x <= 0.05, ifelse (x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*"), "ns")) #passed to box plot
+
+alpha$Skin_Type <- sapply(alpha$Skin_Type, function(x) paste(x, " (n=", results_SkinType$N[results_SkinType$Sample == x], ")", sep = ""))
+
+alpha$Sample <- str_replace(alpha$Sample, "-PMA", "")
+
+alpha$PMA_treated <- ordered(alpha$PMA_treated, levels = c("Raw", "PMA"))
+
+alpha$Skin_Type <- ordered(alpha$Skin_Type, levels = c("Sebaceous (n=21)", "Moist (n=18)", "Dry (n=10)"))
+
+```
+
+###### plotting
+
+```{r, fig.width=7, fig.height=5}
+
+ggplot(alpha, aes(x= PMA_treated, y= Shannon)) +
+  geom_boxplot(aes(fill = PMA_treated), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity") +
+  scale_fill_manual(values = c("tomato4", "moccasin")) +
+  scale_y_log10(expand = expansion(mult = .1)) +
+  theme(axis.title.y = element_text(vjust = 1, size = 12, margin = margin(t = 0, r = 1, b = 0, l = 0)), axis.title.x = element_blank(),  axis.text.x = element_text(color = "black"), axis.text.y = element_text(size = 12, color = "black"), panel.background = element_rect(fill = "white"),  axis.line.x = element_line(color = "black", size = 1), axis.line.y = element_line(color = "black", size = 1), strip.background = element_rect(fill = "white", color = "black", size = 1.5), strip.text = element_text(size = 12),  legend.position = "none", legend.text = element_text(size = 12, ), legend.key=element_rect(fill="white"), legend.title = element_blank()) + 
+  stat_pvalue_manual(data = results_Treatment, label = "Shannon_p.adj", y.position = 0.75)
+
+ggplot(alpha, aes(x= PMA_treated, y= Simpson)) +
+  geom_boxplot(aes(fill = PMA_treated), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson evenness") +
+  scale_fill_manual(values = c("tomato4", "moccasin")) +
+  scale_y_log10(expand = expansion(mult = .1)) +
+  theme(axis.title.y = element_text(vjust = 1, size = 12, margin = margin(t = 0, r = 1, b = 0, l = 0)), axis.title.x = element_blank(),  axis.text.x = element_text(color = "black"), axis.text.y = element_text(size = 12, color = "black"), panel.background = element_rect(fill = "white"),  axis.line.x = element_line(color = "black", size = 1), axis.line.y = element_line(color = "black", size = 1), strip.background = element_rect(fill = "white", color = "black", size = 1.5), , strip.text = element_text(size = 12),  legend.position = "none", legend.text = element_text(size = 12, ), legend.key=element_rect(fill="white"), legend.title = element_blank()) + 
+  stat_pvalue_manual(data = results_Treatment, label = "Simpson_p.adj", y.position = 0.05)
+
+ggplot(alpha, aes(x= PMA_treated, y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity") +
+  scale_fill_manual(values = bpart_colors) +
+ scale_y_log10(expand = expansion(mult = .1)) +
+  facet_wrap(.~as.factor(Skin_Type)) +
+  theme(axis.title.y = element_text(vjust = 1, size = 12, margin = margin(t = 0, r = 1, b = 0, l = 0)), axis.title.x = element_blank(),  axis.text.x = element_text(size = 12, color = "black"), axis.text.y = element_text(size = 12, color = "black"), panel.background = element_rect(fill = "white"),  axis.line.x = element_line(color = "black", size = 1), axis.line.y = element_line(color = "black", size = 1), strip.background = element_rect(fill = "white", color = "black", size = 1.5), strip.text = element_text(size = 12),  legend.position = "none", legend.text = element_text(size = 12, ), legend.key=element_rect(fill="white"), legend.title = element_blank()) + 
+  stat_pvalue_manual(data = results_SkinType, label = "Shannon_p.adj", y.position = 0.75)
+
+ggplot(alpha, aes(x= PMA_treated, y= Simpson)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson Evenness") +
+  scale_fill_manual(values = bpart_colors) +
+  scale_y_log10(expand = expansion(mult = .1)) +
+  facet_wrap(.~as.factor(Skin_Type)) +
+  theme(axis.title.y = element_text(vjust = 1, size = 12, margin = margin(t = 0, r = 1, b = 0, l = 0)), axis.title.x = element_blank(),  axis.text.x = element_text(color = "black"), axis.text.y = element_text(size = 12, color = "black"), panel.background = element_rect(fill = "white"),  axis.line.x = element_line(color = "black", size = 1), axis.line.y = element_line(color = "black", size = 1), strip.background = element_rect(fill = "white", color = "black", size = 1.5), strip.text = element_text(size = 12),  legend.position = "none", legend.text = element_text(size = 12, ), legend.key=element_rect(fill="white"), legend.title = element_blank()) + 
+  stat_pvalue_manual(data = results_SkinType, label = "Simpson_p.adj", y.position = 0.05)
+
+ggplot(alpha[alpha$PMA_treated == "PMA",], aes(x= as.factor(Skin_Type), y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity") +
+  scale_fill_manual(values = bpart_colors) +
+  scale_y_log10(expand = expansion(mult = .1)) +
+  theme(axis.title.y = element_text(vjust = 1, size = 12, margin = margin(t = 0, r = 1, b = 0, l = 0)), axis.title.x = element_blank(),  axis.text.x = element_text(size = 10, color = "black"), axis.text.y = element_text(size = 12, color = "black"), panel.background = element_rect(fill = "white"),  axis.line.x = element_line(color = "black", size = 1), axis.line.y = element_line(color = "black", size = 1), strip.background = element_rect(fill = "white", color = "black", size = 1.5), strip.text = element_text(size = 12),  legend.position = "none", legend.text = element_text(size = 12), legend.key=element_rect(fill="white"), legend.title = element_blank()) + 
+  stat_compare_means(comparisons = list(c("Moist (n=18)", "Dry (n=10)"), c("Moist (n=18)", "Sebaceous (n=21)"), c("Dry (n=10)", "Sebaceous (n=21)")), label = "p.signif")
+
+ggplot(alpha[alpha$PMA_treated == "PMA",], aes(x= as.factor(Skin_Type), y= Simpson)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson Evenness") +
+  scale_fill_manual(values = bpart_colors) +
+  scale_y_log10(expand = expansion(mult = .1)) +
+  theme(axis.title.y = element_text(vjust = 1, size = 12, margin = margin(t = 0, r = 1, b = 0, l = 0)), axis.title.x = element_blank(),  axis.text.x = element_text(size = 10, color = "black"), axis.text.y = element_text(size = 12, color = "black"), panel.background = element_rect(fill = "white"),  axis.line.x = element_line(color = "black", size = 1), axis.line.y = element_line(color = "black", size = 1), strip.background = element_rect(fill = "white", color = "black", size = 1.5), strip.text = element_text(size = 12),  legend.position = "none", legend.text = element_text(size = 12, ), legend.key=element_rect(fill="white"), legend.title = element_blank()) + 
+  stat_compare_means(comparisons = list(c("Moist (n=18)", "Dry (n=10)"), c("Moist (n=18)", "Sebaceous (n=21)"), c("Dry (n=10)", "Sebaceous (n=21)")), label = "p.signif")
+
+```
