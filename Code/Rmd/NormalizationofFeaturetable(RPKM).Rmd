@@ -1,0 +1,164 @@
+---
+title: "NormalizationofFeaturetable(RPKM)"
+author: "Deepan"
+date: "7/29/2024"
+output: html_document
+---
+
+```{r}
+
+#importing the cpm normalized dataset
+
+data <- read.table("/Final_Species_frequency.tsv",
+                    sep="",
+                    dec=".",
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    na.strings = NA,
+                    check.names = FALSE,
+                    comment.char = "")
+
+#grabbing the genome lengths of the identified OGUs from the Web of Life database.
+
+wol_length <- read.delim("Wol_length_completeness.tsv",
+                    sep="\t", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    na.strings = NA,
+                    check.names = FALSE, 
+                    comment.char = "")
+
+#grabbing the average read length of the samples. 
+
+rlengths <- read.delim("avg_read_lengths.csv",
+                    sep="\t", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    na.strings = NA,
+                    check.names = FALSE, 
+                    comment.char = "")
+
+```
+
+#formatting them
+
+```{r}
+
+wol_length <- aggregate(wol_length[,2], by = list(wol_length$species), FUN = mean)
+
+wol_length[wol_length$Group.1 == "Cutibacterium acnes",]
+
+
+wol_length$Group.1 <- str_replace(wol_length$Group.1 , "\\[", "")
+wol_length$Group.1 <- str_replace(wol_length$Group.1 , "\\]", "")
+
+rlengths$Avg_length <- str_replace(rlengths$Avg_length, "Average: ", "")
+rlengths$Avg_length <- sapply(rlengths$Avg_length, function(x) round(as.integer(x),0))
+rlengths <-rlengths[rlengths$Sample %in% colnames(data[,-1]),]
+rlengths <- as.data.frame(t(rlengths))
+colnames(rlengths) <- rlengths[1,]
+rlengths <- rlengths[-1,]
+rlengths$Group.1 <- rownames(rlengths)
+rlengths <- rlengths[,colnames(data)]
+rlengths[,-1] <- sapply(rlengths[,-1], as.double)
+
+```
+
+#normalizing the data by z-score to estimate the top hits across all samples.
+
+```{r, fig.height=16, fig.width= 7}
+
+##correct order of df will be determined by median of values after z-score outlier removal
+temp <- data #temperaory df for performing z-score adjustment
+temp[,-1] <- temp[,-1] %>%
+  rowwise() %>%
+  mutate(across(everything(), ~ifelse(abs(. - mean(c_across(everything()))) / sd(c_across(everything())) > 2, 0, .))) #z-score based removal of reads past 2nd standard deviation
+temp$median <- apply(temp[,-1], 1, median)
+temp <- temp[order(temp$median, decreasing = TRUE),] #re-ordering top taxa by median levels of values found across all samples. 
+
+data$Group.1 <- ordered(data$Group.1, levels = c(temp$Group.1)) #re-ordering original feature table using this order. 
+data <- data[order(data$Group.1),]
+rownames(data) <- row_number(data$Group.1)
+
+```
+
+# normalizing each samples' reads by average read length, each taxa in sample by genome length, and all samples finally by total sample reads
+
+```{r}
+
+data_length <- data
+
+wol_length <- wol_length[wol_length$Group.1 %in% as.character(data_length$Group.1),]
+colnames(wol_length)[2] <- "genome_length"
+wol_length$Group.1 <- ordered(wol_length$Group.1, levels = data_length$Group.1)
+wol_length <- wol_length[order(wol_length$Group.1),]
+
+data_length <- rbind(data_length, rlengths)
+
+#multiple by avg read lengths in each sample
+
+data_length[,-1] <- data_length[,-1] * c(data_length[nrow(data_length), -1]) 
+
+data_length <- merge(data_length, wol_length, by = "Group.1")
+data_length <- data_length[order(data_length$Group.1),]
+
+#divide by genome length of each identified taxa
+
+data_length[,-1] <- data_length[,-1] / data_length[,ncol(data_length)] 
+data_length <- data_length[, -ncol(data_length)]
+
+data_length$median <- apply(data_length[,-1], 1, function(x) median(x))
+
+data_length <- data_length[order(data_length$median, decreasing = TRUE),]
+
+#aggregate by genus
+
+genus <- data_length
+genus$Group.1 <- str_split(genus$Group.1, " ", simplify = TRUE)[,1]
+genus <- aggregate(genus[,-1], by = list(genus$Group.1), sum)
+
+#normalize by sample total reads
+
+genus[,-1] <- apply(genus[,-1], 2, function(x) x/sum(x))
+
+#re-order by median across all samples
+
+genus$median <- apply(genus[,-1], 1, function(x) median(x))
+genus <- genus[order(genus$median, decreasing = TRUE),]
+
+#re-order species level df by genus order
+
+data_length$genus <- str_split(data_length$Group.1, " ", simplify = TRUE)[,1]
+data_length$genus <- ordered(data_length$genus, levels = c(genus$Group.1))
+
+#only keep top 30 taxa (relative proportions of taxa >= 1e-04 only kept at individual species level)
+
+top30 <- data_length[1:30,]
+top30 <- top30[order(top30$genus),]
+
+#re-order full species level df by this order
+
+data_length_all <- data_length
+
+data_length$Group.1 <- ordered(data_length$Group.1, levels = c(as.character(top30$Group.1[1:30]), "other"))
+data_length <- data_length[order(data_length$Group.1),]
+data_length$Group.1[is.na(data_length$Group.1)] <- "other"
+
+data_length <- data_length[,-ncol(data_length)]
+
+#normalize by sample total reads
+data_length[,-1] <- apply(data_length[,-1], 2, function(x) x/sum(x))
+data_length$Group.1[16:nrow(data_length)] <- "other"
+
+data_length <- aggregate(data_length[, c(2:ncol(data_length))], by = list(data_length$Group.1), sum)
+
+data_length_low <- data_length_all[16:nrow(data_length_all),]
+data_length_all[,2:99] <- apply(data_length_all[,2:99], 2, function(x) x/sum(x))
+data_length_low[,2:99] <- apply(data_length_low[,2:99], 2, function(x) x/sum(x))
+
+
+write.table(data_length, "Final_genomelengthnormalized_topspec_relative.tsv", row.names = FALSE, sep = "\t")
+
+```
