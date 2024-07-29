@@ -1,0 +1,21 @@
+---
+title: "16scopies_rrnDB"
+author: "Deepan"
+date: "7/23/2024"
+output: html_document
+---
+
+```{r}
+
+db <- read.table("/media/deepan/Deepan/rrnDB/rrnDB-5.8.tsv", sep = "\t", fill = TRUE, header = TRUE, check.names = FALSE)
+
+db <- db[,c(6,12)]
+
+round(median(db[str_detect(db$`NCBI scientific name`, "Staphylococcus"),2], na.rm = TRUE))
+round(median(db[str_detect(db$`NCBI scientific name`, "Cutibacterium|Propionibacterium"),2], na.rm = TRUE))
+round(median(db[str_detect(db$`NCBI scientific name`, "Corynebacterium"),2], na.rm = TRUE))
+round(median(db[str_detect(db$`NCBI scientific name`, "Streptococcus"),2], na.rm = TRUE))
+
+
+```
+
