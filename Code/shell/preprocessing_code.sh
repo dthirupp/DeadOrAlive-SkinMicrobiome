@@ -1,3 +1,10 @@
+# This script is meant to be a guide for the methodology used and the order. 
+# It is not meant to be a standalone code that can work for all workflows. 
+# This script also requires bowtie2 indices to be built for the negative controls (swab and blank).
+# This script uses conda environmemts to run packages. The following packages could all be installed into the same environment, except for Zebra. 
+# Zebra is a standalone set of python scripts. Refer Hakim at al. 2022 for more information.
+
+
 #This script uses the following packages:
 #
 #1. Trimgalore (Martin, 2011)
@@ -10,9 +17,14 @@
 
 #This script also requires the following dataset to be downloaded
 #1. Web Of Life (Zhu et al., 2019)
+#2. Skin Microbial Genome Collection (SMGC) (Saheb-Kashaf et al. 2022)
 
 #--------------------------------------------------------------------
 
+
+#!/bin/bash
+
+source ~/miniconda3/etc/profile.d/conda.sh
 
 conda activate woltka
 
@@ -40,7 +52,7 @@ done <sample_names.txt
 
 multiqc ./fastqc_reports/
 
-#Computing average read length within each sample
+# (optional) Computing average read length within each sample. 
 
 while read -r sample; do
         average=$(awk 'NR >= 2 && (NR - 2) % 4 == 0 { char_count[length]++; total_chars += length; } END { avg = total_chars / (((NR - 2) / 4) + 1); print "Average: " avg }' "${sample}merged.fq.gz")
@@ -48,34 +60,93 @@ while read -r sample; do
         echo "${sample} done"
 done < sample_names.txt
 
-#Aligning to Web Of Life
+# Make bowtie2 indices for swab and blank samples. 
+
+bowtie2-build swab_blank_control_30uLbeads.fasta .../swab_blank_control_index
+
+
+# filtering steps: from each experimental file, filter out swab, blank and host reads. Swab and blank filtered out with global mode. Host filtered out with local. 
 
 while read -r sample; do
-	bowtie2 -U ./merged_flash/${sample}merged.fq.gz -x ./*location_of_WoL*/WoLr1 -p 12 --very-sensitive --no-head --no-unal -k 16 --np 1 --mp "1,1" --rdg "0,1" --rfg "0,1" --score-min "L,0,-0.05" | cut -f1-9 | sed 's/$/\t*\t*/' | gzip > ./samfiles/${sample}.sam.gz
-done < sample_names.txt
 
-#Calculate genomes coverages
+        echo -e "\nfiltering swab and blank reads from ${sample} files in paired mode"
 
-source ~/.bashrc
-conda activate woltka
-python ~/zebra_filter/calculate_coverages.py -i ./samfiles -o ./coverages.txt -d ~/zebra_filter/databases/WoL/metadata.tsv
+        bowtie2 -p 10 -x .../swab_blank_control_index/swab_blank_control_index \
+                -1 .../trimmed_files_backup/${sample}_L002_R1_001_val_1.fq.gz \
+                -2 .../trimmed_files_backup/${sample}_L002_R2_001_val_2.fq.gz \
+                --very-sensitive \
+                --un-conc-gz ${sample}_swabandblanks_removed \
+                > /dev/null 2> "${sample}_swabblanks_metrics.txt"
+
+        mv ${sample}_swabandblanks_removed.1 .../swab_blank_removed/${sample}_swabandblanks_removed_1.fastq.gz
+        mv ${sample}_swabandblanks_removed.2 .../swab_blank_removed/${sample}_swabandblanks_removed_2.fastq.gz
+
+        echo -e "\ndone filtering swab and blank reads for ${sample} files"
+
+        SALGN=$(grep "overall alignment rate" ${sample}_swabblanks_metrics.txt| awk '{print $1}')
+
+        echo -e "\nfiltering host reads from ${sample} files in paired mode"
+
+        bowtie2 -p 8 -x .../databases/GRCh38p14/GCA_000001405.15_GRCh38_full_analysis_set.fna.bowtie_index \
+                -1 .../swab_blank_removed/${sample}_swabandblanks_removed_1.fastq.gz \
+                -2 .../swab_blank_removed/${sample}_swabandblanks_removed_2.fastq.gz \
+                --very-sensitive-local \
+                --un-conc-gz ${sample}_host_removed \
+                > /dev/null 2> "${sample}_host_metrics.txt"
+
+        mv ${sample}_host_removed.1 .../host_removed/${sample}_host_removed_1.fastq.gz
+        mv ${sample}_host_removed.2 .../host_removed/${sample}_host_removed_2.fastq.gz
+
+        echo -e "\ndone filtering host reads for ${sample} files"
+
+        HALGN=$(grep "overall alignment rate" ${sample}_host_metrics.txt| awk '{print $1}')
+
+        echo -e "\ndone filtering host reads from all files"
+
+        echo -e "\nmoving on to SMGC alignment rates"
+
+        echo -e "\naligning ${sample} host-removed files to SMGC database"
+
+        bowtie2 -p 8 -x .../databases/SMGC/bacteria_mags_nocontigs/bacteria_mags_nocontigs \
+                -1 .../host_removed/${sample}_host_removed_1.fastq.gz \
+		-2 .../host_removed/${sample}_host_removed_2.fastq.gz \
+                --very-sensitive-local \
+                --met-file "${sample}_SMGC_metrics.txt" \
+                -S /dev/stdout | gzip > "${sample}_SMGC.sam.gz"
+
+        DALGN=$(grep "overall alignment rate" ${sample}_SMGC_metrics.txt| awk '{print $1}')
+
+        echo -e "${sample}\t${SALGN}\t${HALGN}\t${DALGN}" >> host_alignment_stats.tsv
+
+ 	echo -e "\ndone. aligning to WoL"
+
+   	bowtie2 -U ./merged_flash/${sample}merged.fq.gz -x ./*location_of_WoL*/WoLr1 
+    		-p 12 
+      		--very-sensitive --no-head --no-unal -k 16 --np 1 --mp "1,1" --rdg "0,1" --rfg "0,1" --score-min "L,0,-0.05" | cut -f1-9 | sed 's/$/\t*\t*/' | gzip > ./WoL_samfiles/${sample}.sam.gz
+
+done <sample_names.txt
+
+echo -e "\ncompleted filtering all samples and then aligning to SMGC. Refer host_alignment_stats.tsv for filtering and alignment details"
 
 
-#Create of a subset of the WoL database that contains only genomes with >25% genome coverage:
+# Calculate genomes coverages (onbly for SMGC alignment. WoL was used to identify relic-DNA for beta-diversity only. If using for taxonomy, must do coverage calculations)
 
-python ~/zebra_filter/filter_sam.py -i ~/coverages.txt -s ~/*location_of_WoL*/WoLr1 -c 0.25 -o ./Zebra_25perc_samfiles
+python .../zebra_filter/calculate_coverages.py -i ./samfiles -o SMGC_coverages.txt -d ~/storage/databases/SMGC/SMGC_bacteria_metadata.tsv
 
-#Taxonomic Classification at the Genus level
+# Move to R script ("Rmd/0.Zebra_coverages_calculated_aligningtoSMGC") to determine what coverage threshold top pick. This should be the global minima in the genome coverage density plots. 
 
-woltka classify --input ./Zebra_25perc_samfiles --map ~/*location_of_WoL*/taxonomy/taxid.map --nodes ~/*location_of_WoL*/taxonomy/nodes.dmp --names ~/*location_of_WoL*/taxonomy/names.dmp --output ./Classify_Species_zebra_25perc/Skin_LiveDead_Zebra_25perc_Woltka_Classify_Species.biom --rank species --name-as-id --outmap ./Classify_Species_zebra_25perc
+# Filter samfiles based on coverage cutoff. 60 percent was the global minima for this dataset. 
 
-#making OGU tables for core-metrics
+echo -e "\nfiltering sam files based on the cutoff, deteremined separately in an R script"
 
-pip install upgrade numpy ##upgrade numpy if needed
+python .../zebra_filter/filter_sam.py -i SMGC_coverages.txt  -s samfiles/ -c 0.60 -o filtered_SMGC_samfiles/
 
-woltka classify -i ./Zebra_25perc_samfiles -o ogu_25percent_table.biom
+# Making feature table using default mode (keep them all and divide) and no rank using woltka --classify.
 
+woltka classify -i filtered_60perc_SMGC_samfiles -o SMGC_60perc.biom 
 
+## for WoL
+woltka classify --input ./WoL_samfiles --map ~/*location_of_WoL*/taxonomy/taxid.map --nodes ~/*location_of_WoL*/taxonomy/nodes.dmp --names ~/*location_of_WoL*/taxonomy/names.dmp --output ./WoL_aligned.biom --rank species --name-as-id
 
 conda deactivate
 
