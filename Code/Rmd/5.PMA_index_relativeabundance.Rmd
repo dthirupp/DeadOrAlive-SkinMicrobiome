@@ -1,0 +1,218 @@
+---
+title: "5. PMA_Index"
+author: "Deepan"
+date: "12/28/2024"
+output: html_document
+---
+
+## Load libraries
+
+```{r, message = FALSE}
+# Packages I commonly use
+# install.packages("stringr")
+# install.packages("ggplot2")
+# install.packages("reshape")
+# install.packages("reshape2")
+# install.packages("gplots")
+# install.packages("FactoMineR")
+# install.packages("factoextra")
+library(stringr)
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+library(reshape)
+library(reshape2)
+library(gplots)
+library(RColorBrewer)
+```
+
+## Define color vectors
+
+```{r}
+
+bpart_colors <- c("darkgoldenrod", "lightskyblue3", "indianred")
+
+indiv_colors_RPCA <- c("1" = "firebrick4", "2" = "darkolivegreen", "3" = "midnightblue", "4" = "coral1", "5" = "lightpink1", "6" = "lightskyblue3", "7" = "goldenrod1", "8" = "sienna3", "9" = "olivedrab4", "10" = "slateblue2", "11" = "burlywood4", "12" = "aquamarine4")
+
+indiv_colors <- c("firebrick4", "darkolivegreen", "midnightblue", "coral1", "lightpink1", "lightskyblue3",  "goldenrod1", "sienna3", "olivedrab4", "slateblue2", "burlywood4", "aquamarine4")
+
+bpart_colors_RPCA <- c("Sebaceous" = "darkgoldenrod", "Moist" = "lightskyblue3", "Dry" = "indianred")
+
+vec_col0 <- c("indianred"  ,  "gold"      ,    "rosybrown4"  ,   "powderblue"      ,     "lightsteelblue2"     ,     "lightpink"   ,   "darkseagreen4" , "palegreen"  ,    "peachpuff3" , "khaki4"    ,     "orchid4" , "darkolivegreen", "rosybrown3"  ,   "palevioletred2" ,
+              "darkorange1"    ,      "paleturquoise3" , "khaki"     ,     "dodgerblue4" ,   "sienna2"    ,    "darkgreen"   ,   "lightsalmon"  ,  "orchid2" ,   "lightsteelblue4"  ,   "lightsalmon2" ,  "lemonchiffon3"  , "honeydew"  ,   "sienna4"   ,  "darkolivegreen2"    ,    "gold1", "ivory3")
+
+```
+
+## Import RPKM normalized sorted dataframe and all taxa median levels
+
+```{r}
+
+df <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted_RPKM_sorted.tsv", check.names = FALSE) #only samples with paired Raw and PMA-treated
+
+df[, -1] <- sapply(df[, -1], as.numeric)
+
+df$Taxa <- str_replace(df$Taxa, "s_", "")
+
+order <- unique(df$Taxa)
+
+taxa <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_alltaxa_medianRPKM.tsv", check.names = FALSE)
+
+taxa[, -1] <- sapply(taxa[, -1], as.numeric)
+taxa$Taxa <- str_replace(taxa$Taxa, "s_", "")
+
+```
+
+## Aggregate by taxa
+
+```{r}
+
+df <- aggregate(df[, -1], by = list( df$Taxa), sum)
+
+df$Group.1 <- ordered(df$Group.1, levels = order)
+
+df <- df[order(df$Group.1), ]
+
+```
+
+
+## Split PMA and Raw
+
+```{r}
+
+index <- melt(df[ df$Group.1 != "other" , colnames(df) %in% c("Group.1", colnames(df)[str_detect(colnames(df), "PMA")])]) #only grabbing PMA samples first
+
+index$bs <- str_split(index$variable, "-", simplify = TRUE)[, 2]
+
+index$unique <- paste(index$Group.1, index$variable, sep = "-")
+
+index <- index[, c(5, 3)]
+
+colnames(index)[2] <- "RA_PMA"
+
+index$unique <- str_replace(index$unique, "-PMA", "")
+
+temp <- melt(df[ df$Group.1 != "other" , colnames(df) %in% c("Group.1", colnames(df)[!str_detect(colnames(df), "PMA")])]) #now grabbing raw
+
+temp$bs <- str_split(temp$variable, "-", simplify = TRUE)[, 2]
+
+temp$unique <- paste(temp$Group.1, temp$variable, sep = "-")
+
+temp <- temp[, c(5, 3)]
+
+colnames(temp)[2] <- "RA_Raw"
+
+index <- merge(index, temp, by = "unique")
+
+index$group <- paste(str_split(index$unique, "-", simplify = TRUE)[, 1], str_split(index$unique, "-", simplify = TRUE)[, 3], sep = "_")
+
+
+compute_wilcox <- function(data, group_col, value1_col, value2_col) {
+  results <- data.frame()
+  grouped_data <- data %>% group_by(!!sym(group_col))
+  
+  for (group_name in unique(grouped_data[[group_col]])) {
+    group_subset <- grouped_data %>% filter(!!sym(group_col) == group_name)
+    if (nrow(group_subset) > 3) {  # Skip if insufficient data
+      wilcox_result <- wilcox.test(group_subset[[value1_col]], group_subset[[value2_col]], paired = TRUE)
+      result_row <- data.frame(
+        Group = group_name,
+        N = nrow(group_subset),
+        PValue = p.adjust( wilcox_result$p.value, method = "fdr", n = nrow(group_subset)),
+        statistic = wilcox_result$statistic
+      )
+      results <- rbind(results, result_row)
+    }
+  }
+  
+
+  results$PValue <- sapply(results$PValue, function(x) {
+    if (x <= 0.05) ifelse(x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*") else "ns"
+  })
+  return(results)
+}
+
+results_tax <- compute_wilcox(index[, c(2:4)], "group", "RA_Raw", "RA_PMA")
+
+print(results_tax)
+
+# index$group <- paste(str_split(index$unique, "-", simplify = TRUE)[, 1], str_split(index$unique, "-", simplify = TRUE)[, 2], sep = "_")
+# results_tax <- compute_wilcox(index[, c(2:4)], "group", "RA_Raw", "RA_PMA")
+# 
+# print(results_tax)
+# 
+# index$group <- paste(str_split(index$unique, "-", simplify = TRUE)[, 1], sep = "")
+# results_tax <- compute_wilcox(index[, c(2:4)], "group", "RA_Raw", "RA_PMA")
+# 
+# print(results_tax)
+
+
+index <- index[, -ncol(index)]
+
+index$Index <- index$RA_PMA / (index$RA_PMA + index$RA_Raw)
+
+index <- index[, c(1, 4)]
+
+```
+
+## Aggregating by average and computing sd
+
+```{r}
+
+index$unique <- paste( str_split(index$unique, "-", simplify = TRUE)[, 1], str_split(index$unique, "-", simplify = TRUE)[, 3], sep = "-")
+
+plot <- aggregate(index[ , 2], by = list(index$unique), mean)
+
+colnames(plot)[2] <- "Index" 
+
+plot <- merge( plot, aggregate(index[ , 2], by = list(index$unique), sd))
+
+colnames(plot)[3] <- "SD"
+
+```
+
+
+## Plotting
+
+```{r}
+
+plot$Taxa <- str_split(plot$Group.1, "-", simplify = TRUE)[, 1]
+plot$BS <- str_split(plot$Group, "-", simplify = TRUE)[, 2]
+
+plot$SkinType <- ifelse( plot$BS %in% c( "FH", "UB"), "Sebaceous",
+                        ifelse( plot$BS %in% c( "AC", "PC"), "Moist", "Dry"))
+
+plot <- plot[, c(4, 2, 3, 5, 6)]
+
+plot$Group <- paste(plot$Taxa, plot$BS, sep = "_")
+
+plot <- merge(plot, taxa, by = "Taxa")
+
+plot <- merge(plot, results_tax, by = "Group")
+
+plot$SD_label <- paste(round(plot$SD, 2), plot$PValue, sep = " ")
+
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PMA_index.tiff", units="in", width=7, height=6, res=300)
+ggplot(plot, aes(x = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")), y = ordered(Taxa, levels = order[order != "other"]), fill = Index)) +
+  geom_tile(color = "black", width = 1, height = 1, size = 0.25) +
+  geom_text(aes(label =  stringr::str_wrap(SD_label, 2)), size = 3) +
+   scale_fill_gradientn(
+    colors = c("#007c7c", "#ffffff", "#ffd700"),  # Specify the three colors
+    values = c(0, 0.5, 1),  # These are the relative positions (0 = low, 0.5 = mid, 1 = high)
+    name = "PMA_index", 
+    limits = c(0, 1)) +
+  #scale_color_gradient(low = "lightgrey", high = "red", name = "std.dev", limits = c(0, 0.7)) +
+  labs(x = "", y = "") +
+  theme_minimal() +
+  scale_y_discrete(limits = rev(levels(ordered(plot$Taxa, levels = order[order != "other"])))) +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 1, colour = "black"),
+    axis.text.y = element_text(face = "italic", color = "black"),
+    panel.grid = element_blank(),
+    legend.position = "right"
+  )
+dev.off()
+
+```
+
+

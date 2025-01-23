@@ -1,0 +1,688 @@
+---
+title: "7. Absolute_Abundance_estimation"
+author: "Deepan"
+date: "12/30/2024"
+output: html_document
+---
+
+## Load libraries
+
+```{r, message = FALSE}
+# Packages I commonly use
+# install.packages("stringr")
+# install.packages("ggplot2")
+# install.packages("reshape")
+# install.packages("reshape2")
+# install.packages("gplots")
+# install.packages("FactoMineR")
+# install.packages("factoextra")
+library(stringr)
+library(ggplot2)
+library(ggpubr)
+library(FactoMineR)
+library(factoextra)
+library(reshape)
+library(reshape2)
+library(gplots)
+library(RColorBrewer)
+library(phyloseq)
+library(vegan)
+library(plyr)
+library(rstatix)
+
+```
+
+```{r}
+
+bpart_colors <- c("darkgoldenrod", "lightskyblue3", "indianred")
+
+indiv_colors_RPCA <- c("1" = "firebrick4", "2" = "darkolivegreen", "3" = "midnightblue", "4" = "coral1", "5" = "lightpink1", "6" = "lightskyblue3", "7" = "goldenrod1", "8" = "sienna3", "9" = "olivedrab4", "10" = "slateblue2", "11" = "burlywood4", "12" = "aquamarine4")
+
+indiv_colors <- c("firebrick4", "darkolivegreen", "midnightblue", "coral1", "lightpink1", "lightskyblue3",  "goldenrod1", "sienna3", "olivedrab4", "slateblue2", "burlywood4", "aquamarine4")
+
+bpart_colors_RPCA <- c("Sebaceous" = "darkgoldenrod", "Moist" = "lightskyblue3", "Dry" = "indianred")
+
+vec_col0 <- c("indianred"  ,  "gold"      ,    "rosybrown4"  ,   "powderblue"      ,     "lightsteelblue2"     ,     "lightpink"   ,   "darkseagreen4" , "palegreen"  ,    "peachpuff3" , "khaki4"    ,     "orchid4" , "darkolivegreen", "rosybrown3"  ,   "palevioletred2" ,
+              "darkorange1"    ,      "paleturquoise3" , "khaki"     ,     "dodgerblue4" ,   "sienna2"    ,    "darkgreen"   ,   "lightsalmon"  ,  "orchid2" ,   "lightsteelblue4"  ,   "lightsalmon2" ,  "lemonchiffon3"  , "honeydew"  ,   "sienna4"   ,  "darkolivegreen2"    ,    "gold1", "ivory3")
+
+# sample order vector for paired analysis
+
+sample_order <- c("1-AC-PMA", "1-AC", "1-FH-PMA", "1-FH", "1-UB-PMA", "1-UB", "2-AC-PMA", "2-AC", "2-FH-PMA", "2-FH", "2-UB-PMA", "2-UB", "3-FH-PMA", "3-FH", "3-PC-PMA", "3-PC", "3-UB-PMA", "3-UB", "4-AC-PMA", "4-AC", "4-FA-PMA", "4-FA", "4-FH-PMA", "4-FH", "4-PC-PMA", "4-PC", "4-UB-PMA", "4-UB", "5-AC-PMA", "5-AC", "5-FA-PMA", "5-FA", "5-PC-PMA", "5-PC", "5-UB-PMA", "5-UB", "6-AC-PMA", "6-AC", "6-FH-PMA", "6-FH", "6-PC-PMA", "6-PC", "6-UB-PMA", "6-UB", "7-FA-PMA", "7-FA", "7-FH-PMA", "7-FH", "7-PC-PMA", "7-PC", "7-UB-PMA", "7-UB", "8-AC-PMA", "8-AC", "8-Abd-PMA",  "8-Abd",  "8-FA-PMA", "8-FA", "8-FH-PMA", "8-FH", "8-PC-PMA", "8-PC", "8-UB-PMA", "8-UB", "9-AC-PMA", "9-AC", "9-FH-PMA", "9-FH", "9-PC-PMA", "9-PC", "10-Abd-PMA", "10-Abd", "10-FA-PMA", "10-FA", "10-FH-PMA", "10-FH", "10-UB-PMA",  "10-UB",  "11-AC-PMA",  "11-AC", "11-FA-PMA", "11-FA",  "11-FH-PMA", "11-FH", "11-PC-PMA",  "11-PC",  "11-UB-PMA",  "11-UB")
+
+```
+
+## themes and functions
+
+```{r}
+
+theme_boxp <- function(){
+  
+  font <- "Times New Roman"
+  
+  theme_minimal() %+replace%
+    
+    theme(axis.title.y = element_text(angle = 90, size = 10), 
+          axis.title.x = element_blank(),   
+          axis.text.x = element_text(angle = 45, size = 10, color = "black"), 
+          axis.text.y = element_text(size = 10, color = "black"), 
+          
+          panel.background = element_rect(fill = "white"),  
+          axis.line.x = element_line(color = "black"), 
+          axis.line.y = element_line(color = "black"), 
+          
+          legend.text = element_text(size = 10, lineheight = 0.6), 
+          legend.spacing.y = unit(0.6, "mm"), 
+          legend.key.height = unit(2, "mm"), 
+          legend.key=element_rect(fill="white", color="black", linewidth = 0), 
+          legend.title = element_blank(), 
+          strip.background = element_rect(fill = NA, linetype = "solid", size = 1, colour = "black"), 
+          strip.text = element_text(size = 10, margin = margin(1,1,1,1)), 
+          panel.border = element_rect(fill = NA, size = 1),
+          panel.spacing.y = unit(1,"line"),
+    )
+}
+
+lm_eqn <- function(df){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+
+```
+
+## Import rpkm normalized df
+
+```{r}
+
+df <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted_RPKM_sorted.tsv", check.names = FALSE)
+
+df[, -1] <- sapply(df[, -1], as.numeric)
+
+count_metadata <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/count_metadata.tsv", check.names = FALSE)
+
+metadata <- read.table("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/metadata.csv",
+                    sep=",", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    na.strings = "",
+                    check.names = FALSE, 
+                    comment.char = "")[-1, ]
+
+rownames(metadata) <- metadata$Sample
+
+#metadata <- metadata[colnames(df[, -1]),] # maybe needed only later?
+
+metadata[, c(-25, -26)] <- sapply(metadata[, c(-25, -26)], as.character)
+
+```
+
+
+```{r}
+
+counts <- metadata[, c(1, 4, 25)]
+
+counts$Sample <- str_replace(counts$Sample, "-PMA", "")
+
+counts <- dcast(counts, Sample~PMA_treated, value.var = "Total cells")
+
+counts[, -1] <- sapply(counts[, -1], as.numeric)
+
+counts$dead <- counts$Raw - counts$PMA
+
+counts$dead[counts$dead < 0] <- 0
+
+counts <- counts[, c(1, 3, 2, 4)]
+
+counts$percent_dead <- (counts$dead / counts$Raw)*100
+
+counts$percent_live <- 100 * (counts$PMA / counts$Raw)
+
+counts$Indiv <- str_split(counts$Sample, "-", simplify = TRUE)[, 1]
+
+counts$Body_Part <- str_split(counts$Sample, "-", simplify = TRUE)[, 2]
+
+counts$Skin_Type <- ifelse(str_detect(counts$Body_Part, "FH|UB"), "Sebaceous", 
+                           ifelse(str_detect(counts$Body_Part, "AC|PC"), "Moist", "Dry"))
+
+error <- unique(c(counts[counts$percent_live > 150, ]$Sample), na.rm = TRUE) #removing 3 samples that had greater than 150% live percent. Most likely signal aggregation error from flow C. Both raw and PMA treatment versions of these samples are dropped
+
+counts <- counts[!counts$Sample %in% error,]
+
+length(counts$Raw[complete.cases(counts$Raw)])
+length(counts$PMA[complete.cases(counts$PMA)])
+
+#write.table(counts, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/absolute_counts.tsv", row.names = FALSE, sep = "\t", quote = FALSE)
+
+#counts <- counts[counts$Sample %in% count_metadata$Sample,]
+
+#counts <- counts[ order( ordered(counts$Sample, levels = sample_order)), ]
+
+write.table(counts, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/absolute_counts.tsv", row.names = FALSE, sep = "\t", quote = FALSE)
+
+```
+
+```{r}
+
+df_112 <- counts[str_split(counts$Sample, "-", simplify = TRUE)[, 1] == "1" | str_split(counts$Sample, "-", simplify = TRUE)[, 1] == "12",]
+
+df_112 <- df_112[, c(1:3, 7, 8)]
+
+df_112 <- melt(df_112)
+
+df_112$group <- paste(df_112$Body_Part, df_112$variable, sep = "_")
+
+df_112 <- dcast(df_112, group~Indiv, value.var = "value")
+
+df_112 <- df_112[complete.cases(df_112),]
+
+colnames(df_112)[-1] <- c("x", "y")
+
+df_112$BS <- str_split(df_112$group, "_", simplify = TRUE)[, 1]
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_Raw_flowcytometerresults.tiff", units="in", width=7, height=6, res=300)
+ggplot(df_112[str_detect(df_112$group, "_Raw"), ], aes(x = x, y = y, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
+  geom_point( size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE, method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (Raw Samples)",
+    subtitle = "Analysis of Cells per sq cm",
+    x = "Volunteer 1 (timepoint 1) (cells per sq cm)",
+    y = "Volunteer 1 (timepoint 2) (cells per sq cm)",
+    color = "Taxa",
+    shape = paste("BodySite",  "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_Raw")])), "samples from each tp)")
+  ) +
+ stat_cor(data = df_112[str_detect(df_112$group, "_Raw"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+   guides(
+    color = guide_legend(ncol = 1),
+    shape = guide_legend(ncol = 2) 
+  ) +
+    scale_y_log10() +
+  scale_x_log10() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+)
+dev.off()
+
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_PMA_flowcytometerresults.tiff", units="in", width=7, height=6, res=300)
+ggplot(df_112[str_detect(df_112$group, "_PMA"), ], aes(x = x, y = y, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
+  geom_point(size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE,method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (PMA Samples)",
+    subtitle = "Analysis of Cells per sq cm",
+    x = "Volunteer 1 (timepoint 1) (cells per sq cm)",
+    y = "Volunteer 1 (timepoint 2) (cells per sq cm)",
+    color = "Taxa",
+    shape = paste("BodySite",  "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_PMA")])), "samples from each tp)")
+  ) +
+  # Add regression equation text
+  stat_cor(data = df_112[str_detect(df_112$group, "_PMA"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman", label.y = 6) +
+   guides(
+    color = guide_legend(ncol = 1),
+    shape = guide_legend(ncol = 2) 
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+)
+dev.off()
+
+
+```
+
+
+```{r}
+
+# Helper function for Wilcoxon test and formatting results
+perform_wilcox_test <- function(data, group_col, value1_col, value2_col) {
+  results <- data.frame()
+  grouped_data <- data %>% group_by(!!sym(group_col))
+  
+  for (group_name in unique(grouped_data[[group_col]])) {
+    group_subset <- grouped_data %>% filter(!!sym(group_col) == group_name)
+    if (nrow(group_subset) > 1) {  # Skip if insufficient data
+      wilcox_result <- wilcox.test(group_subset[[value1_col]], group_subset[[value2_col]], paired = TRUE)
+      result_row <- data.frame(
+        Group = group_name,
+        N = nrow(group_subset),
+        PValue = p.adjust(wilcox_result$p.value, method = "fdr", nrow(group_subset))
+      )
+      results <- rbind(results, result_row)
+    }
+  }
+  
+  results$group1 <- "PMA"
+  results$group2 <- "Raw"
+  results$PValue <- sapply(results$PValue, function(x) {
+    if (x <= 0.05) ifelse(x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*") else "ns"
+  })
+  return(results)
+}
+
+# 1. All samples
+wilcox_result <- wilcox.test(counts$PMA, counts$Raw, paired = TRUE)
+results_Treatment <- data.frame(
+  group1 = "PMA",
+  group2 = "Raw",
+  PValue = as.numeric(round(p.adjust(wilcox_result$p.value, method = "fdr", nrow(counts)), 3)),
+  N = nrow(counts),
+  y.position = 6
+)
+results_Treatment$PValue <- ifelse(results_Treatment$PValue <= 0.05, 
+                                   ifelse(results_Treatment$PValue <= 0.01, 
+                                          ifelse(results_Treatment$PValue <= 0.001, "***", "**"), "*"), "ns")
+
+# 2. Grouped by Body Part
+results_BPart <- perform_wilcox_test(counts, "Body_Part", "PMA", "Raw")
+
+# 3. Grouped by Skin Type
+results_SType <- perform_wilcox_test(counts, "Skin_Type", "PMA", "Raw")
+
+# 4. Grouped by Individual
+results_Indiv <- perform_wilcox_test(counts, "Indiv", "PMA", "Raw")
+
+results_BPart$Body_Part <- results_BPart$Group
+results_SType$Skin_Type <- results_SType$Group
+results_Indiv$Indiv <- results_Indiv$Group
+
+```
+
+```{r}
+
+results_Treatment
+results_BPart
+results_SType
+results_Indiv
+
+```
+
+
+```{r}
+
+
+
+
+counts[, -4:-6] %>%
+    melt() %>%
+  group_by(Body_Part) %>%
+  levene_test(data = ., value ~ variable)
+  wilcox_test(data = ., value ~ variable, paired = FALSE)%>%
+  adjust_pvalue(method = "fdr") %>%
+  add_significance("p.adj")
+
+aggregate(counts[, c(2,3,6)], by = list(counts$Body_Part), function(x) (IQR(x, na.rm = TRUE))) %>%
+  mutate(percent_live = NULL) %>%
+  melt() %>%
+  ggplot(aes(x = variable, y = value)) +
+  facet_wrap(~Group.1, scales = "free") +
+  stat_pvalue_manual(stats, label = "p.adj.signif", y.position = )
+    geom_boxplot()
+
+
+
+```
+
+
+
+## Table 2 main
+
+```{r}
+
+temp <- aggregate(counts[, c(2,3,6)], by = list(counts$Body_Part), median,  na.rm = TRUE)
+temp2 <- aggregate(counts[, c(2,3,6)], by = list(counts$Body_Part), function(x) paste("(IQR " , round(quantile(x, 3/4, na.rm = TRUE), 0), "-", round(quantile(x, 1/4, na.rm = TRUE), 0), ")", sep = ""))
+
+colnames(temp2)[-1] <-  paste(colnames(temp2)[-1], "_iqr", sep = "")
+
+temp <- merge(temp, temp2)
+
+colnames(temp)[1] <- "Group"
+
+temp$Raw <- paste(round(temp$Raw, 0), temp$Raw_iqr, sep = " ")
+temp$PMA <- paste(round(temp$PMA, 0), temp$PMA_iqr, sep = " ")
+temp$percent_live <- paste(round(temp$percent_live, 2), temp$percent_live_iqr, sep = " ")
+
+
+temp <- merge(temp[, 1:4], results_BPart[, c(1:3)], by = "Group")
+
+write.table(temp, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/Table2_cellcounts.tsv", row.names = FALSE, sep = "\t", quote = FALSE)
+
+```
+
+
+
+##### (c): Make boxplots.
+
+
+```{r}
+temp <- melt(counts[, !colnames(counts) %in% c("dead", "percent_dead", "frac_liv", "percent_live")])
+colnames(temp)[5:6] <- c("Treatment", "Count")
+
+#set levels for uniform order in plots
+temp$Treatment <- factor(temp$Treatment, levels = c("Raw", "PMA"))
+temp$Skin_Type <- factor(temp$Skin_Type, levels = c("Sebaceous", "Moist", "Dry"))
+
+temp$error <- ifelse(temp$Sample %in% error, "red", "gray30")
+
+```
+
+##### Fig 1 :
+
+```{r, fig.width = 8, fig.height=6}
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/AbsoluteAbundance_byBodySite.tiff", units="in", width=7, height=5, res=300)
+ggplot(temp, aes(x = Treatment, y = Count)) + 
+  geom_boxplot(aes(fill = Treatment), lwd = 0.8, fatten = 1.2, outlier.shape = NA) + 
+  geom_point(size = 1, alpha = 0.8) +  # No jitter for proper line connection
+  geom_line(aes(group = Sample, color = error), size = 0.3) +
+  scale_fill_manual(values = c("tomato4", "moccasin")) + 
+  scale_color_manual(values = c("grey30", "red")) +
+  scale_y_log10(expand = expansion(mult = 0.1)) +
+  labs(y = "Cells per sq cm") +
+  facet_wrap(.~ordered(Body_Part, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")), scales = "free_y") + 
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.spacing = unit(1, "lines"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8), # Facet borders
+    strip.text = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 30, hjust = 1, colour = "black"),
+    axis.text.y = element_text(colour = "black"),
+    axis.title.x = element_blank(),
+    legend.position = "none"
+  ) +
+  stat_pvalue_manual(results_BPart, label = "PValue", hide.ns = TRUE, y.position = 6)
+dev.off()
+
+
+```
+
+##### Fig 1 :
+
+```{r, fig.width=8, fig.height=8}
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/AbsAbund_byInd.tiff", units="in", width=7, height=8, res=300)
+ggplot(temp, aes(x = Treatment, y = Count)) + 
+  geom_boxplot(aes(fill = Treatment), lwd = 0.8, fatten = 1.2, outlier.shape = NA) + 
+  geom_point(size = 2, alpha = 0.8, aes(color = Skin_Type)) +  # No jitter for proper line connections
+  geom_line(aes(group = Sample), size = 0.3, color = "gray30") +
+  scale_fill_manual(values = c("tomato4", "moccasin")) + 
+  scale_color_manual(values = bpart_colors) +
+  scale_y_log10(expand = expansion(mult = 0.2)) +
+  labs(y = "Cells per sq cm", x = "") +
+  facet_wrap(.~ordered(Indiv, levels = c(1:12)), ncol = 4, nrow = 3) + 
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.spacing = unit(1, "lines"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8), # Facet borders
+    strip.text = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 30, hjust = 1, colour = "black"),
+    axis.text.y = element_text(colour = "black"),
+    legend.position = "none"  # Removes the legend
+  ) +
+  stat_pvalue_manual(results_Indiv, label = "PValue", bracket.size = 0, hide.ns = TRUE, y.position = 0.1, size = 5) 
+  # stat_compare_means(
+  #   method = "wilcox.test", paired = TRUE, hide.ns = TRUE,
+  #   label.y = 0.25, label.x = 0.65, label = "p.format", size = 4
+  # )
+dev.off()
+
+```
+
+##### Fig 4:
+
+```{r}
+
+#svg("~/Dropbox/Deepan-Only/UCSD/Zengler Lab/Skin Microbiome/LiveDead/PaperFigures/Final/Fig3-CellCounts-SkinType.svg", width = 8, height = 5)
+ggplot(temp, aes(x = Treatment, y = Count)) + 
+  geom_boxplot(aes(fill = Treatment), lwd = 1, fatten = TRUE) + 
+  geom_point() +
+  scale_fill_manual(values = c("tomato4", "moccasin")) + 
+  geom_line(aes(group = Sample), size = 0.1, linetype = "solid") +
+  scale_y_log10(expand = expansion(mult = .1)) +
+  labs(y = "Cells per sq cm") +
+  facet_wrap(.~as.factor(Skin_Type), ncol = 3) +
+  theme_boxp() + 
+  stat_pvalue_manual(results_SType, label = "PValue", hide.ns = TRUE, y.position = 6)
+#dev.off()
+
+#display actual cell number values (included in manuscript body)
+
+# formatC(mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Sebaceous"], na.rm = TRUE))
+# formatC(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Sebaceous"], na.rm = TRUE))
+# paste(round(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Sebaceous"], na.rm = TRUE)/ mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Sebaceous"], na.rm = TRUE) * 100, 2), "%", sep = "")
+# 
+# formatC(mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Moist"], na.rm = TRUE))
+# formatC(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Moist"], na.rm = TRUE))
+# paste(round(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Moist"], na.rm = TRUE)/ mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Moist"], na.rm = TRUE) * 100, 2), "%", sep = "")
+# 
+# formatC(mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Dry"], na.rm = TRUE))
+# formatC(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Dry"], na.rm = TRUE))
+# paste(round(mean(temp$Count[temp$Treatment == "PMA" & temp$Skin_Type == "Dry"], na.rm = TRUE)/ mean(temp$Count[temp$Treatment == "Raw" & temp$Skin_Type == "Dry"], na.rm = TRUE) * 100, 2), "%", sep = "")
+# 
+# 
+# aggregate(temp[, 6], by = list(temp$Body_Part, temp$Treatment), mean)
+
+```
+
+##### Fig  :
+
+```{r, fig.height=4, fig.width=6}
+
+#svg("~/Dropbox/Deepan-Only/UCSD/Zengler Lab/Skin Microbiome/LiveDead/PaperFigures/Final/Fig3-CellCounts-all.svg",height = 3, width = 3)
+ggplot(temp, aes(x = Treatment, y = Count)) + 
+  geom_boxplot(aes(fill = Treatment), lwd = 1, fatten = TRUE) + 
+  geom_point() +
+  scale_fill_manual(values = c("tomato4", "moccasin")) + 
+  geom_line(aes(group = Sample), size = 0.1, linetype = "solid") +
+  scale_y_log10(expand = expansion(mult = .1)) +
+  labs(y = "Cells per sq cm") +
+  theme_boxp() + 
+  theme(legend.position = "none") +
+  stat_pvalue_manual(data = results_Treatment, label = "PValue", hide.ns = TRUE, y.position = 6)
+#dev.off()
+
+```
+
+##### Multi group testing- doing post hoc kruskal wallis (dunn's test)
+
+###### Fig 1 ():
+
+```{r, fig.width = 5, fig.height = 5}
+
+counts$Skin_Type <- ordered(counts$Skin_Type, levels = c("Sebaceous", "Moist", "Dry"))
+
+#kruskal_test
+res.kruskal <- counts %>% kruskal_test(percent_live ~ Skin_Type)
+res.kruskal
+
+#effect size (eta squared)
+counts %>% kruskal_effsize(percent_live ~ Skin_Type)
+
+#effect size is large. Proceed with Dunn's test
+pwc <- counts %>% 
+  dunn_test(percent_live ~ Skin_Type, p.adjust.method = "fdr")
+pwc
+
+#plotting
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PercentLive_SkinType.tiff", units="in", width=5, height=5, res=300)
+ggplot(counts, aes(x = Skin_Type, y= percent_live)) + 
+  geom_boxplot(aes(fill = Skin_Type), lwd = 1, fatten = TRUE) + 
+  geom_point() +
+  scale_fill_manual(values = c(bpart_colors)) + 
+  #scale_y_log10() +
+  scale_y_continuous(breaks = c(0,50,100)) +
+  stat_pvalue_manual(pwc, hide.ns = TRUE, y.position = 105, bracket.nudge.y = 0.5, step.increase = 0.1) +
+  labs(
+    subtitle = get_test_label(res.kruskal, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+    ) +
+  labs( y = "Percentage (%)") +
+  theme_boxp() + theme(legend.position = "none")
+#dev.off()
+
+pwc
+
+```
+
+## by individuals
+
+```{r}
+
+counts$Indiv <- ordered(counts$Indiv, levels = c(unique(counts$Indiv)))
+
+#kruskal_test
+res.kruskal <- counts[complete.cases(counts),] %>% 
+  kruskal_test(percent_live ~ Indiv)
+res.kruskal
+
+#effect size (eta squared)
+counts %>%
+  kruskal_effsize(percent_live ~ Indiv)
+
+#effect size is SMALL No Dunn's test
+# pwc <- counts %>%
+#   dunn_test(percent_live ~ Indiv, p.adjust.method = "fdr")
+# pwc
+
+#plotting
+
+length(unique())
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PercentLive_Ind.tiff", units="in", width=7, height=5, res=300)
+ggplot(counts, aes(x = ordered(Indiv, levels = c(1:12)), y= percent_live)) + 
+  geom_boxplot(aes(fill = Indiv), lwd = 1, fatten = TRUE, outlier.colour = "white") + 
+  geom_point(aes(color = Skin_Type, shape = Body_Part)) +
+  scale_fill_manual(values = c(indiv_colors)) +
+   scale_color_manual(values = c(bpart_colors)) +
+  #scale_y_log10() +
+  scale_y_continuous(breaks = c(0,50,100)) +
+  #stat_pvalue_manual(pwc, hide.ns = TRUE, y.position = 105, bracket.nudge.y = 0.2, step.increase = 0.1) +
+  labs(
+    subtitle = get_test_label(res.kruskal, detailed = TRUE),
+    #caption = get_pwc_label(pwc)
+    ) +
+  labs( y = "Percentage (%)") +
+  theme_boxp() + theme(axis.text.x = element_text(size = 12), 
+                       axis.text.y = element_text(size = 12),
+                       panel.grid = element_blank())
+dev.off()
+
+
+```
+
+
+```{r, fig.width = 5, fig.height = 5}
+
+counts$Indiv <- ordered(counts$Indiv, levels = c(unique(counts$Indiv)))
+
+# Kruskal-Wallis Test
+res.kruskal <- counts %>%
+  group_by(Skin_Type) %>%
+  kruskal_test(percent_live ~ Indiv) %>%
+  mutate(label = paste("K-W =", round(statistic,2), ", p =", signif(p, 3), sep = ""),
+         x = c(rep(3, 3)), 
+         y = c(10, 80, 80))  # Add formatted p-value label
+
+# Dunn's Test with p-value adjustment
+pwc <- counts %>%
+  group_by(Skin_Type) %>%
+  dunn_test(percent_live ~ Indiv, p.adjust.method = "fdr") %>%
+  add_y_position()  # Dynamically calculate y.position for each facet
+
+# Plotting
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PercentLive_Ind_bySkinType.tiff", units="in", width=6, height=8, res=300)
+ggplot(counts, aes(x = ordered(Indiv, levels = c(1:12)), y = percent_live)) + 
+  geom_boxplot(aes(fill = Indiv), lwd = 1, fatten = TRUE) + 
+  geom_point(alpha = 0.8) +  # Adjust jitter
+  scale_fill_manual(values = indiv_colors) +
+  scale_y_continuous(breaks = c(0, 50, 100)) +
+  facet_wrap(~Skin_Type, scales = "fixed", nrow = 3) +
+  stat_pvalue_manual(pwc, hide.ns = TRUE) +  # Add p-values from Dunn's test
+  geom_text(
+    data = res.kruskal, aes(label = label, x = x, y = y),  # Adjust label position
+    inherit.aes = FALSE, size = 4
+  ) +
+  labs(
+    y = "Percentage (%)",
+    subtitle = "Kruskal-Wallis test results by Skin Type",
+    caption = get_pwc_label(pwc)
+  ) +
+  theme_boxp() + 
+  theme(legend.position = "none", axis.text.x = element_text(angle = 0))
+dev.off()
+
+
+
+```
+
+###### Supp Fig 1 ():
+
+```{r}
+
+counts$Body_Part <- factor(counts$Body_Part, levels = c("FH", "UB", "AC", "PC", "FA", "Abd"))
+
+#kruskal_test
+res.kruskal <- counts %>% kruskal_test(percent_live ~ Body_Part)
+res.kruskal
+
+#effect size (eta squared)
+counts %>% kruskal_effsize(percent_live ~ Body_Part)
+
+#effect size is large. Proceed with Dunn's test
+pwc <- counts %>% 
+  dunn_test(percent_live ~ Body_Part, p.adjust.method = "fdr")
+pwc
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PercentLive_BodySite.tiff", units="in", width=5, height=5, res=300)
+ggplot(counts, aes(x = Body_Part, y= percent_live)) + 
+  geom_boxplot(aes(fill = Skin_Type), lwd = 1, fatten = TRUE) + 
+  geom_point() +
+  scale_fill_manual(values = c(bpart_colors)) + 
+  scale_y_continuous(limits = c(0,150), breaks = c(0,25, 50, 75, 100)) +
+  stat_pvalue_manual(pwc, hide.ns = TRUE, y.position = 120, bracket.nudge.y = 10, step.increase = 0.04) +
+  labs(
+    subtitle = get_test_label(res.kruskal, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+    ) +
+  labs( y = "Percentage (%)") +
+  theme_boxp() + theme(legend.position = "none", axis.text.x = element_text(angle = 0))
+dev.off()
+
+#pwc
+
+```
+
+

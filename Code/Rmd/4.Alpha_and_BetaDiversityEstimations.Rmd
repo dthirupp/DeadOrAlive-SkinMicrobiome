@@ -1,0 +1,928 @@
+---
+title: "4.ShannonDiversity"
+author: "Deepan"
+date: "12/27/2024"
+output: html_document
+---
+
+## Load libraries
+
+```{r, message = FALSE}
+# Packages I commonly use
+# install.packages("stringr")
+# install.packages("ggplot2")
+# install.packages("reshape")
+# install.packages("reshape2")
+# install.packages("gplots")
+# install.packages("FactoMineR")
+# install.packages("factoextra")
+# install.packages("geometry")
+
+library(geometry)
+library(stringr)
+library(ggplot2)
+library(ggpubr)
+library(FactoMineR)
+library(factoextra)
+library(reshape)
+library(reshape2)
+library(gplots)
+library(RColorBrewer)
+library(phyloseq)
+library(vegan)
+library(plyr)
+```
+
+## Define color vectors
+
+```{r}
+
+bpart_colors <- c("darkgoldenrod", "lightskyblue3", "indianred")
+
+indiv_colors_RPCA <- c("1" = "firebrick4", "2" = "darkolivegreen", "3" = "midnightblue", "4" = "coral1", "5" = "lightpink1", "6" = "lightskyblue3", "7" = "goldenrod1", "8" = "sienna3", "9" = "olivedrab4", "10" = "slateblue2", "11" = "burlywood4", "12" = "aquamarine4")
+
+indiv_colors <- c("firebrick4", "darkolivegreen", "midnightblue", "coral1", "lightpink1", "lightskyblue3",  "goldenrod1", "sienna3", "olivedrab4", "slateblue2", "burlywood4", "aquamarine4")
+
+bpart_colors_RPCA <- c("Sebaceous" = "darkgoldenrod", "Moist" = "lightskyblue3", "Dry" = "indianred")
+
+vec_col0 <- c("indianred"  ,  "gold"      ,    "rosybrown4"  ,   "powderblue"      ,     "lightsteelblue2"     ,     "lightpink"   ,   "darkseagreen4" , "palegreen"  ,    "peachpuff3" , "khaki4"    ,     "orchid4" , "darkolivegreen", "rosybrown3"  ,   "palevioletred2" ,
+              "darkorange1"    ,      "paleturquoise3" , "khaki"     ,     "dodgerblue4" ,   "sienna2"    ,    "darkgreen"   ,   "lightsalmon"  ,  "orchid2" ,   "lightsteelblue4"  ,   "lightsalmon2" ,  "lemonchiffon3"  , "honeydew"  ,   "sienna4"   ,  "darkolivegreen2"    ,    "gold1", "ivory3")
+
+```
+
+## plotting themes and functions
+
+```{r}
+
+theme_boxp <- function(){
+  
+  font <- "Times New Roman"
+  
+  theme_minimal() %+replace%
+    
+    theme(axis.title.y = element_text(angle = 90, size = 10), 
+          axis.title.x = element_blank(),   
+          axis.text.x = element_text(angle = 45, size = 10, color = "black"), 
+          axis.text.y = element_text(size = 10, color = "black"), 
+          
+          panel.background = element_rect(fill = "white"),  
+          axis.line.x = element_line(color = "black"), 
+          axis.line.y = element_line(color = "black"), 
+          
+          legend.text = element_text(size = 10, lineheight = 0.6), 
+          legend.spacing.y = unit(0.6, "mm"), 
+          legend.key.height = unit(2, "mm"), 
+          legend.key=element_rect(fill="white", color="black", linewidth = 0), 
+          legend.title = element_blank(), 
+          strip.background = element_rect(fill = NA, linetype = "solid", size = 1, colour = "black"), 
+          strip.text = element_text(size = 10, margin = margin(1,1,1,1)), 
+          panel.border = element_rect(fill = NA, size = 1),
+          panel.spacing.y = unit(1,"line"),
+    )
+}
+
+theme_pca <- function(){
+  
+  font <- "Times New Roman"
+  
+  theme_boxp() %+replace%
+    
+    theme(legend.position = "none", 
+          axis.title.y = element_text(angle = 90, size = 12, color = "black"),
+          axis.title.x = element_text(size = 12, color = "black"),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10),
+          )
+}
+
+lm_eqn <- function(df){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+
+```
+
+
+```{r}
+
+df <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted.tsv", check.names = FALSE, row.names = 1)
+
+tree <-  ape::read.tree('/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/SMGC_insamples_phylo_distancetree.nwk')
+
+metadata <- read.table("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/metadata.csv",
+                    sep=",", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    na.strings = "",
+                    check.names = FALSE, 
+                    comment.char = "")[-1, ]
+
+rownames(metadata) <- metadata$Sample
+
+metadata <- metadata[colnames(df),]
+
+metadata[, c(-25, -26)] <- sapply(metadata[, c(-25, -26)], as.character)
+
+df[, 1:ncol(df)] <- sapply(df[, 1:ncol(df)], as.numeric) #make all numeric inputs
+
+df <- as.matrix(df)
+
+otu_table_ps <- otu_table(df, taxa_are_rows = TRUE)
+sample_data_ps <- sample_data(metadata)
+physeq <- phyloseq(otu_table_ps, sample_data_ps)
+
+names <- taxa_names(physeq)
+
+# Transform counts (if necessary)
+physeq <- transform_sample_counts(physeq, as.integer, taxa_are_rows = TRUE)
+
+taxa_names(physeq) <- names
+
+physeq <- merge_phyloseq(physeq, phy_tree(tree))
+
+# Estimate alpha diversity
+alpha <- estimate_richness(physeq, split = TRUE, measures = NULL)
+
+alpha$Sample <- rownames(alpha)
+alpha$Sample <- str_replace(alpha$Sample, "X", "")
+alpha$Sample <- str_replace_all(alpha$Sample, "\\.", "-")
+
+alpha <- merge(alpha, metadata, by = "Sample")
+
+```
+
+```{r}
+
+depth <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/sequencing_depth.tsv")
+
+alpha <- merge(alpha, depth, by.x = "Sample", by.y = "sample")
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/correlation_shannonvsseqdepth.tiff", units="in", width=4, height=4, res=300)
+ggplot(alpha, aes(x = Shannon, y = SequencingDepth, color = Skin_Type)) +
+  geom_point(size = 2) +
+  scale_color_manual(values = bpart_colors) +
+  geom_smooth(method = "lm", colour = "grey20", fill = "grey60") +
+  stat_cor(data = alpha[, c(7,35)], aes(x = Shannon, y = SequencingDepth), inherit.aes = FALSE,p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+  theme_pca()
+#dev.off()
+
+cor(alpha$Shannon, alpha$SequencingDepth, method = 'spearman')
+cor(alpha$Simpson, alpha$SequencingDepth, method = 'spearman')
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/correlation_simpsonvsseqdepth.tiff", units="in", width=4, height=4, res=300)
+ggplot(alpha, aes(x = Simpson, y = SequencingDepth)) + 
+  geom_point(aes(color = Skin_Type), size = 2) + 
+  scale_color_manual(values = bpart_colors) +
+  geom_smooth(method = "lm", colour = "grey20", fill = "grey60") +
+  stat_cor(data = alpha[, c(8,35)], aes(x = Simpson, y = SequencingDepth), inherit.aes = FALSE,p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+  theme_pca()
+#dev.off()
+
+
+```
+
+
+## Box plots for diversity metrics
+
+### All samples
+```{r}
+
+ggplot(alpha, aes(x= PMA_treated, y= Shannon)) +
+  geom_boxplot(aes(fill = PMA_treated), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity") +
+  scale_fill_manual(values = c("tomato4", "moccasin")) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+
+ggplot(alpha, aes(x= PMA_treated, y= Simpson)) +
+  geom_boxplot(aes(fill = PMA_treated), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson evenness") +
+  scale_fill_manual(values = c("tomato4", "moccasin")) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+
+```
+
+### Skin Type
+```{r}
+
+ggplot(alpha, aes(x= PMA_treated, y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity") +
+  scale_fill_manual(values = bpart_colors) +
+ scale_y_log10(expand = expansion(mult = .1)) +
+  facet_wrap(.~as.factor(Skin_Type)) + stat_compare_means() + theme_boxp()
+
+ggplot(alpha, aes(x= PMA_treated, y= Simpson)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson evenness") +
+  scale_fill_manual(values = bpart_colors) +
+ scale_y_log10(expand = expansion(mult = .1)) +
+  facet_wrap(.~as.factor(Skin_Type)) + stat_compare_means() + theme_boxp()
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Shannon_diversity_bodysite.tiff", units="in", width=6, height=4, res=300)
+ggplot(alpha, aes(x= ordered(PMA_treated, levels = c("Raw", "PMA")), y= Shannon)) +
+  geom_boxplot(aes(fill = PMA_treated), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity") +
+  scale_fill_manual(values = c("tomato4", "moccasin")) +
+ scale_y_log10(expand = expansion(mult = .1)) +
+  facet_wrap(.~as.factor(BodySite_ID)) + stat_compare_means(method = "wilcox", label = "p.signif",  size = 4) + theme_boxp() + 
+  theme(axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        strip.text = element_text(size = 12),
+        panel.grid = element_blank()
+        )
+#dev.off
+      
+
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/simpson_diversity_bodysite.tiff", units="in", width=6, height=4, res=300)
+ggplot(alpha, aes(x= ordered(PMA_treated, levels = c("Raw", "PMA")), y= Simpson)) +
+  geom_boxplot(aes(fill = PMA_treated), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson evenness") +
+  scale_fill_manual(values = c("tomato4", "moccasin")) +
+ scale_y_log10(expand = expansion(mult = .1)) +
+    facet_wrap(.~as.factor(BodySite_ID)) + stat_compare_means(method = "wilcox", label = "p.signif",  size = 4) + theme_boxp() + 
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        strip.text = element_text(size = 12),
+        panel.grid = element_blank()
+        )
+dev.off()
+
+```
+
+### PMA treated only and Raw only
+```{r}
+
+ggplot(alpha[alpha$PMA_treated == "PMA",], aes(x= as.factor(Skin_Type), y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity PMA treated only") +
+  scale_fill_manual(values = bpart_colors) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+
+ggplot(alpha[alpha$PMA_treated != "PMA",], aes(x= as.factor(Skin_Type), y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity Raw only") +
+  scale_fill_manual(values = bpart_colors) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+
+
+ggplot(alpha[alpha$PMA_treated == "PMA",], aes(x= as.factor(Skin_Type), y= Simpson)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson Evenness PMA treated only") +
+  scale_fill_manual(values = bpart_colors) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+
+ggplot(alpha[alpha$PMA_treated != "PMA",], aes(x= as.factor(Skin_Type), y= Simpson)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson Evenness Raw only") +
+  scale_fill_manual(values = bpart_colors) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+
+
+```
+
+## By body site
+
+
+```{r}
+ggplot(alpha[alpha$PMA_treated == "PMA",], aes(x= ordered(BodySite_ID, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")), y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Shannon Diversity PMA treated only") +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+
+
+# Kruskal-Wallis Test
+res.kruskal_shannon <- alpha %>%
+  group_by(PMA_treated) %>%
+  kruskal_test(Shannon ~ Skin_Type) %>%
+  mutate(label = paste("K-W =", round(statistic,2), ", p =", signif(p, 3), sep = ""),
+         x = c(rep(2,2)), 
+         y = c(2.8, 2.8))  # Add formatted p-value label
+
+res.kruskal_simpson <- alpha %>%
+  group_by(PMA_treated) %>%
+  kruskal_test(Simpson ~ Skin_Type) %>%
+  mutate(label = paste("K-W =", round(statistic,2), ", p =", signif(p, 3), sep = ""),
+         x = c(rep(2,2)), 
+         y = c(1.4, 1.4))  # Add formatted p-value label
+
+
+# # Dunn's Test with p-value adjustment
+# pwc <- alpha %>%
+#   group_by(PMA_treated) %>%
+#   dunn_test(Shannon ~ BodySite_ID, p.adjust.method = "fdr") %>%
+#   add_y_position()  # Dynamically calculate y.position for each facet
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Shannon_diversity_bodysite_comp.tiff", units="in", width=6, height=4.5, res=300)
+ggplot(alpha,  aes(x= ordered(BodySite_ID, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")), y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  facet_wrap(~ordered(PMA_treated, levels = c("Raw", "PMA")), nrow = 2) +
+  labs(y = "Shannon Diversity") +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  scale_y_log10(expand = expansion(mult = .1)) + 
+  #stat_compare_means(label.y = c(0.45,0.45)) + 
+   geom_text(
+    data = res.kruskal_shannon, aes(label = label, x = x, y = y),  # Adjust label position
+    inherit.aes = FALSE, size = 4
+  ) +
+  theme_boxp() + 
+  theme(axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        strip.text = element_text(size = 12),
+        panel.grid = element_blank(), legend.position = "none")
+dev.off()
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Simpson_evenness_bodysite_comp.tiff", units="in", width=6, height=4.5, res=300)
+ggplot(alpha,  aes(x= ordered(BodySite_ID, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")), y= Simpson)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  facet_wrap(~ordered(PMA_treated, levels = c("Raw", "PMA")), nrow = 2) +
+  labs(y = "Simpson Evenness") +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  scale_y_log10(expand = expansion(mult = .1)) + 
+  #stat_compare_means(label.y = c(0.45,0.45)) + 
+   geom_text(
+    data = res.kruskal_simpson, aes(label = label, x = x, y = y),  # Adjust label position
+    inherit.aes = FALSE, size = 4
+  ) +
+  theme_boxp() + 
+  theme(axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        strip.text = element_text(size = 12),
+        panel.grid = element_blank(), legend.position = "none")
+dev.off()
+
+ggplot(alpha[alpha$PMA_treated == "PMA",],  aes(x= ordered(BodySite_ID, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")), y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson Evenness PMA treated only") +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+
+ggplot(alpha[alpha$PMA_treated != "PMA",],  aes(x= ordered(BodySite_ID, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")), y= Shannon)) +
+  geom_boxplot(aes(fill = Skin_Type), lwd = 0.9, fatten = TRUE) +
+  geom_point() +
+  labs(y = "Simpson Evenness Raw only") +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  scale_y_log10(expand = expansion(mult = .1)) + stat_compare_means() + theme_boxp()
+```
+
+
+
+## Beta-diversity metrics (sparsity-controlled, non-imputation using RPCA (Martino et al. 2019))
+
+## stats functions
+
+```{r}
+
+run_dist_matrix_check_stats <- function(dist_matrix, ord) {
+  hist(as.numeric(dist_matrix), main = "Distribution of Pairwise Distances", xlab = "Distance")
+  
+  if( length(unique(ord$Treatment)) > 1){
+    print(adonis2(dist_matrix ~ PMA_treated, data = metadata[metadata$Sample %in% ord$Sample,], method = "robust.aitchison"))
+  }
+  print(adonis2(dist_matrix ~ Skin_Type, data = metadata[metadata$Sample %in% ord$Sample,], method = "robust.aitchison"))
+  
+  print(adonis2(dist_matrix ~ Volunteer_ID, data = metadata[metadata$Sample %in% ord$Sample,], method = "robust.aitchison"))
+}
+
+```
+
+
+### All samples
+
+```{r, fig.height=4, fig.width=4}
+
+rpca <- read.delim("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_all_ordination.tsv.csv", header = TRUE, sep = "\t", check.names = FALSE)[,-4] #only plotting PC1 and PC2. 
+
+rpca$Treatment <- ifelse(str_detect(rpca$Sample, "-PMA"), "PMA", "Raw")
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/RPCA_all_treat.tiff", units="in", width=4, height=4, res=300)
+ggplot(rpca, aes(x = PC1, y = PC2, fill = Treatment)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = c("tomato4", "moccasin")) +
+  labs(x = "PC1 (45.94%)", y = "PC2 (43.37%)") +
+  theme_pca()
+dev.off()
+
+dist <- as.dist(read.delim("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_all_distance.tsv", header = TRUE, row.names = 1, sep = "\t", check.names = FALSE))
+
+run_dist_matrix_check_stats(dist, rpca)
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/RPCA_all_histogram.tiff", units="in", width=4, height=4, res=300)
+hist(as.numeric(dist), main = "Distribution of Pairwise Distances", xlab = "Distance", freq = TRUE)
+dev.off
+
+```
+
+### PMA samples only
+
+```{r, fig.height=4, fig.width=4}
+
+rpca_pma <- read.delim("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_pma_ordination.tsv.csv", header = TRUE, sep = "\t", check.names = FALSE) #only plotting PC1 and PC2. 
+
+rpca_pma$Skin_Type <- ifelse(str_detect(rpca_pma$Sample, "Abd|FA"), "Dry)",
+                         ifelse(str_detect(rpca_pma$Sample, "AC|PC"), "Moist", "Sebaceous"))
+
+rpca_pma$BS <- str_split(rpca_pma$Sample, "-", simplify = TRUE)[, 2]
+
+rpca_pma$Volunteer_ID <- str_split(rpca_pma$Sample, "-", simplify = TRUE)[,1]
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/RPCA_PMA_SkinType.tiff", units="in", width=4, height=4, res=300)
+ggplot(rpca_pma[, -4], aes(x = PC1, y = PC2, fill = Skin_Type)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  labs(x = "PC1 (57.54%)", y = "PC2 (39.73%)") +
+  theme_pca()
+dev.off()
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/RPCA_PMA_ind.tiff", units="in", width=4, height=4, res=300)
+ggplot(rpca_pma, aes(x = PC1, y = PC2, fill = Volunteer_ID)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = indiv_colors_RPCA) +
+  labs(x = "PC1 (57.54%)", y = "PC2 (39.73%)") +
+  theme_pca()
+dev.off()
+
+dist <- as.dist(read.delim("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_pma_distance.tsv", header = TRUE, row.names = 1, sep = "\t", check.names = FALSE))
+
+run_dist_matrix_check_stats(dist, rpca_pma)
+
+```
+
+### Raw samples only
+
+```{r, fig.height=4, fig.width=4}
+
+rpca_nopma <- read.delim("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_no_pma_ordination.tsv.csv", header = TRUE, sep = "\t", check.names = FALSE) #only plotting PC1 and PC2. 
+
+rpca_nopma$Skin_Type <- ifelse(str_detect(rpca_nopma$Sample, "Abd|FA"), "Dry",
+                         ifelse(str_detect(rpca_nopma$Sample, "AC|PC"), "Moist", "Sebaceous"))
+
+rpca_nopma$Volunteer_ID <- str_split(rpca_nopma$Sample, "-", simplify = TRUE)[,1]
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/RPCA_Raw_SkinType.tiff", units="in", width=4, height=4, res=300)
+ggplot(rpca_nopma[, -4], aes(x = PC1, y = PC2, fill = Skin_Type)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = rev(bpart_colors)) +
+  labs(x = "PC1 (48.24%)", y = "PC2 (32.92%)") +
+  theme_pca()
+dev.off()
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/RPCA_Raw_ind.tiff", units="in", width=4, height=4, res=300)
+ggplot(rpca_nopma, aes(x = PC1, y = PC2, fill = Volunteer_ID)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = indiv_colors_RPCA) +
+  labs(x = "PC1 (48.24%)", y = "PC2 (32.92%)") +
+  theme_pca()
+dev.off()
+
+dist <- as.dist(read.delim("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_nopma_distance.tsv", header = TRUE, row.names = 1, sep = "\t", check.names = FALSE))
+
+run_dist_matrix_check_stats(dist, rpca_nopma)
+
+```
+
+## Compute average distance between all samples from same individual or same skin type
+
+```{r}
+
+distances_nopma <- read.table("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_nopma_distance.tsv", header = TRUE, row.names = 1, sep = "\t", check.names = FALSE)
+distances_pma <- read.table("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_pma_distance.tsv", header = TRUE, row.names = 1, sep = "\t", check.names = FALSE)
+
+
+# Helper functions
+get_Volunteer_IDidual_distances <- function(df) {
+  df$Volunteer_ID <- str_split(df$Sample, "-", simplify = TRUE)[,1]
+  df$Volunteer_ID2 <- str_split(df$variable, "-", simplify = TRUE)[,1]
+  df <- df[df$Volunteer_ID == df$Volunteer_ID2, ]
+  df$Sample <- paste(df$Sample, df$variable, sep = "_")
+  df$Volunteer_ID <- as.integer(df$Volunteer_ID)
+  return(df[, c("Sample", "value", "Volunteer_ID")])
+}
+
+# Process Raw samples
+distances_nopma$Sample <- rownames(distances_nopma)
+df <- melt(distances_nopma)
+
+df$Sample_BS <- str_split(df$Sample, "-", simplify = TRUE)[, 2]
+df$variable_BS <- str_split(df$variable, "-", simplify = TRUE)[, 2]
+
+inter_dist <- df[ str_split(df$Sample, "-", simplify = TRUE)[, 1] != str_split(df$variable, "-", simplify = TRUE)[, 1] & df$Sample_BS == df$variable_BS, ]
+inter_dist$Indiv <- str_split(inter_dist$Sample, "-", simplify = TRUE)[, 1]
+
+inter_dist <- aggregate(inter_dist[, c(3)], by = list(inter_dist$Indiv), mean)
+colnames(inter_dist)[2] <- "inter_sample_distance" 
+
+avg_ind <- get_Volunteer_IDidual_distances(df)
+intra_dist <- aggregate(avg_ind[, c(2)], by = list(avg_ind$Volunteer_ID), mean)
+colnames(intra_dist)[2] <- "intra_sample_distance"
+
+raw_distances <- merge(intra_dist, inter_dist, by = "Group.1")
+raw_distances$Group.1 <- sapply(raw_distances$Group.1, as.factor)
+
+distances_pma$Sample <- rownames(distances_pma)
+df <- melt(distances_pma)
+
+df$Sample_BS <- str_split(df$Sample, "-", simplify = TRUE)[, 2]
+df$variable_BS <- str_split(df$variable, "-", simplify = TRUE)[, 2]
+
+inter_dist <- df[ str_split(df$Sample, "-", simplify = TRUE)[, 1] != str_split(df$variable, "-", simplify = TRUE)[, 1] & df$Sample_BS == df$variable_BS, ]
+inter_dist$Indiv <- str_split(inter_dist$Sample, "-", simplify = TRUE)[, 1]
+
+inter_dist <- aggregate(inter_dist[, c(3)], by = list(inter_dist$Indiv), mean)
+colnames(inter_dist)[2] <- "inter_sample_distance" 
+
+avg_ind <- get_Volunteer_IDidual_distances(df)
+intra_dist <- aggregate(avg_ind[, c(2)], by = list(avg_ind$Volunteer_ID), mean)
+colnames(intra_dist)[2] <- "intra_sample_distance"
+
+temp <- merge(intra_dist, inter_dist, by = "Group.1")
+
+raw_distances <- merge(raw_distances, temp, by = "Group.1", suffixes = c("-Raw", "-PMA"))
+
+raw_distances <- melt(raw_distances)
+raw_distances$Treatment <- str_split(raw_distances$variable, "-", simplify = TRUE)[, 2]
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/INter_vs_Intra_INdivdistances.tiff", units="in", width=4, height=5, res=300)
+ggplot(raw_distances, aes(x = ordered(variable, levels = c("intra_sample_distance-Raw", "intra_sample_distance-PMA", "inter_sample_distance-Raw", "inter_sample_distance-PMA")), y = value)) +
+    geom_boxplot(aes(fill = Treatment), width = 0.5, lwd = 1, fatten = TRUE) +
+  geom_point() +
+  scale_fill_manual(values = c("Raw" = "tomato4", "PMA" = "moccasin")) +
+    stat_pvalue_manual(compare_means(value ~ variable, raw_distances, p.adjust.method = "fdr"), label = "p.adj", y.position = c(2.8, 3, 3.2, 3.4, 3.6, 3.8)) + theme_boxp() + theme(legend.position = "none", axis.text.x = element_text(angle = 90), axis.title.y = element_blank(), axis.text.y = element_text(size = 12))
+dev.off()
+
+```
+
+
+
+```{r}
+
+# avg_SkinType <- get_skin_type_distances(df, skin_type_patterns)
+# 
+# # Process PMA-treated samples
+# distances_pma$Sample <- rownames(distances_pma)
+# df <- melt(distances_pma)
+# 
+# df$Sample <- str_replace_all(df$Sample, "-PMA", "")
+# df$variable <- str_replace_all(df$variable, "-PMA", "")
+# 
+# avg_ind_pma <- get_Volunteer_IDidual_distances(df)
+# avg_SkinType_pma <- get_skin_type_distances(df, skin_type_patterns)
+# 
+# # Merge Raw and PMA distances
+# avg_ind <- merge(avg_ind, avg_ind_pma, by = "Sample", suffixes = c("_Raw", "_PMA"))
+# colnames(avg_ind) <-  str_replace(colnames(avg_ind), "value_", "")
+# 
+# avg_SkinType <- merge(avg_SkinType, avg_SkinType_pma, by = "Sample", suffixes = c("_Raw", "_PMA"))
+# colnames(avg_SkinType) <-  str_replace(colnames(avg_SkinType), "value_", "")
+# 
+# 
+# # Statistical Analysis
+# compute_wilcox <- function(data, group_col, value1_col, value2_col) {
+#   results <- data.frame()
+#   grouped_data <- data %>% group_by(!!sym(group_col))
+#   
+#   for (group_name in unique(grouped_data[[group_col]])) {
+#     group_subset <- grouped_data %>% filter(!!sym(group_col) == group_name)
+#     if (nrow(group_subset) > 3) {  # Skip if insufficient data
+#       wilcox_result <- wilcox.test(group_subset[[value1_col]], group_subset[[value2_col]], paired = FALSE)
+#       result_row <- data.frame(
+#         Group = group_name,
+#         N = nrow(group_subset),
+#         PValue = p.adjust( wilcox_result$p.value, method = "fdr", n = nrow(group_subset)),
+#         statistic = wilcox_result$statistic
+#       )
+#       results <- rbind(results, result_row)
+#     }
+#   }
+#   
+#   fisher_combined_p <- -2 * sum(log(results$PValue))
+#   df_combined <- data.frame(
+#   statistic = sum(results$statistic),
+#   combined_p = pchisq(fisher_combined_p, df = 2 * nrow(results), lower.tail = FALSE ),
+#   group1 = "Raw", 
+#   group2 = "PMA"
+#   )
+# 
+#   df_combined$p.adj <- sapply(df_combined$combined_p, function(x) {
+#    if (x <= 0.05) ifelse(x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*") else "ns"
+#    })
+#   return(df_combined)
+# }
+# 
+# 
+# 
+# # Plotting
+# plot_distances <- function(df, results, title, y_col = "value") {
+#   ggplot(melt(df), aes(x = variable, y = !!sym(y_col))) +
+#     geom_boxplot(aes(fill = variable), width = 0.5, lwd = 1, fatten = TRUE) +
+#     stat_pvalue_manual(results, label = "p.adj", y.position = 5) +
+#     scale_fill_manual(values = c("Raw" = "tomato4", "PMA" = "moccasin")) +
+#     labs(title = title, x = "", y = "") +
+#     theme_pca() + theme(plot.title = element_text(size = 10))
+# }
+# 
+# results_Volunteer_ID <- compute_wilcox(data = avg_ind, group_col = "Volunteer_ID_Raw", value1_col= "Raw", value2_col = "PMA")
+# results_SkinType <- compute_wilcox(data = avg_SkinType, group_col = "Skin_Type_Raw", value1_col= "Raw", value2_col = "PMA")
+# 
+# 
+# avg_ind[, c(-2, -4)] <- sapply(avg_ind[, c(-2, -4)], as.character)
+# 
+# tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Distance_Ind.tiff", units="in", width=4, height=4, res=300)
+# plot_distances(avg_ind, results_Volunteer_ID, "Distances Between Samples from Same Volunteer_ID")
+# dev.off()
+# 
+# tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Distance_SkinType.tiff", units="in", width=4, height=4, res=300)
+# plot_distances(avg_SkinType, results_SkinType, "Distances Between Samples from Same Skin Type")
+# dev.off()
+# 
+# avg_ind <- aggregate(avg_ind[, c(2, 4)], by = list(avg_ind$Volunteer_ID_Raw), mean)
+# 
+# avg_SkinType <- aggregate(avg_SkinType[, c(2, 4)], by = list(avg_SkinType$Skin_Type_Raw), mean)
+# 
+# df <- data.frame(x = c("avg_intra_indiv-raw", "avg_inter_indiv-raw", "avg_intra_indiv-PMA", "avg_inter_indiv-PMA"),
+#                  y = c(mean(avg_ind$Raw, na.rm = TRUE), mean(avg_SkinType$Raw, na.rm = TRUE), mean(avg_ind$PMA, na.rm = TRUE), mean(avg_SkinType$PMA, na.rm = TRUE))
+#                  )
+# ggplot(df, aes(x = x, y = y)) + geom_bar(stat = "identity") + stat_compare_means(method = "wilcox.test", comparisons = list(c("avg_intra_indiv-raw", "avg_intra_indiv-PMA"), c("avg_inter_indiv-raw", "avg_inter_indiv-PMA")), label = "p.signif")
+```
+
+
+## Compute convex hull volume per participant from robust aitchison distance matrix for Raw vs PMA treated samples. 
+
+```{r, fig.height=4, fig.width=4}
+
+
+# Group data by your variable of interest (e.g., Volunteer or Skin Type)
+compute_hull_volumes <- function(data, group_column, coord_columns) {
+  group_volumes <- lapply(unique(data[[group_column]]), function(group) {
+    # Subset data for the group
+    group_data <- data[data[[group_column]] == group, coord_columns]
+    
+    # Check if there are enough points for a convex hull (k+1 points for k dimensions)
+    if (nrow(group_data) < ncol(group_data) + 1) {
+      return(data.frame(Group = group, Volume = NA))
+    }
+    
+    # Compute convex hull volume
+    volume <- tryCatch({
+      convhulln(as.matrix(group_data), options = "FA")$vol
+    }, error = function(e) {
+      NA  # Return NA if convex hull cannot be computed
+    })
+    
+    return(data.frame(Group = group, Volume = volume))
+  })
+  
+  # Combine results into a single data frame
+  do.call(rbind, group_volumes)
+}
+
+coord_columns <- c("PC1", "PC2", "PC3") 
+
+# Compute convex hull volumes
+volunteer_hullvolumes <- compute_hull_volumes(rpca_nopma[, -5], "Volunteer_ID", coord_columns)
+volunteer_hullvolumes$PMA <- compute_hull_volumes(rpca_pma[, -5], "Volunteer_ID", coord_columns)$Volume
+
+colnames(volunteer_hullvolumes) <- c("Volunteer_ID", "Raw", "PMA")
+volunteer_hullvolumes <- volunteer_hullvolumes[complete.cases(volunteer_hullvolumes), ]
+
+#normality test
+hist(melt(volunteer_hullvolumes)$value, main = "Histogram", xlab = "Values")
+shapiro.test(melt(volunteer_hullvolumes)$value) # not normally distributed
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Volunteer_convexhullvolume.tiff", units="in", width=4, height=4, res=300)
+ggplot(melt(volunteer_hullvolumes), aes(x = variable, y = value)) + 
+    geom_boxplot(aes(fill = variable), width = 0.5, lwd = 1, fatten = TRUE) +
+    geom_point(aes(color = Volunteer_ID)) +
+  geom_line(aes(group = Volunteer_ID), color = "grey70", size = 0.3) +
+    scale_color_manual(values = indiv_colors) +
+    stat_compare_means(compare_means(value~variable, melt(volunteer_hullvolumes), method = "wilcox.test", p.adjust.method = "fdr", paired = TRUE), comparisons = c("group1", "group2"), label = "p.format") +
+    scale_fill_manual(values = c("Raw" = "tomato4", "PMA" = "moccasin")) +
+  labs(title = "Convex-hull volume for samples from same Volunteer", y = "Robust Aitchison convex-hull volume", x = "") +
+    #scale_y_log10() +
+    theme_pca() +
+    theme(panel.grid = element_blank(), plot.title = element_text(size = 10), axis.title.y = element_text(size = 10))
+#dev.off()
+wilcox.test(value ~ variable, reshape2::melt(volunteer_hullvolumes), paired = TRUE, method = 'wilcox.test')
+
+```
+
+## Beta-diversity metrics (non-rpca)
+
+```{r}
+
+dist_methods <- unlist(distanceMethodList)
+dist_methods <- dist_methods[-(3)]
+dist_methods = dist_methods[-which(dist_methods=="ANY")]
+dist_methods <- dist_methods[(1:11)]
+dist_methods <- dist_methods[!dist_methods %in% "morisita" ]
+
+dist_methods <- dist_methods[c(7, 9)]
+
+```
+
+### All samples and PMA treatment effect
+
+```{r}
+Exp <- data.frame(F =1, "Pr(>F)"=2, check.names = FALSE)
+
+sub <- physeq
+
+plist <- vector("list", length(dist_methods))
+names(plist) = dist_methods
+for( i in dist_methods ){
+  i
+    # Calculate distance matrix
+    iDist <- distance(sub, method=i)
+    # Calculate ordination
+    iMDS  <- ordinate(sub, "MDS", distance=iDist)
+    ## Make plot
+    # Don't carry over previous plot (if error, p will be blank)
+    p <- NULL
+    # Create plot, store as temp variable, p
+    p <- plot_ordination(sub, iMDS, color="PMA_treated", shape="Skin_Type")
+    # Add title to each plot
+    p <- p + ggtitle(paste("MDS using distance method ", i, sep=""))
+    # Save the graphic to file.
+    plist[[i]] = p
+    Exp <- rbind(Exp,  as.data.frame(adonis2(iDist ~ (sample_data(sub)$PMA_treated))[1, c(4,5)]))
+}
+
+Exp <- Exp[-1, ]
+
+df = ldply(plist, function(x) x$data)
+names(df)[1] <- "distance"
+df$distance <- ordered(df$distance, levels =unique(df$distance))
+p = ggplot(df, aes(Axis.1, Axis.2, color=PMA_treated, shape=Skin_Type)) + scale_color_manual("PMA_treated", values = c("tomato4", "moccasin"))
+p = p + geom_point(size=3)
+p = p + facet_wrap(~distance, scales="free", nrow = 2)
+p = p + ggtitle("MDS on various distance metrics for Enterotype dataset")
+
+
+rownames(Exp) <- dist_methods
+colnames(Exp) <- paste("Experiment_", colnames(Exp))
+
+#tiff("/media/deepan/Deepan/skin_ ___", units="in", width=16, height=8, res=300)
+p + theme_bw() + theme(axis.text = element_text(size = 10), axis.title = element_text(size = 12),
+         legend.text = element_text(size = 12), legend.title = element_text(size = 16), strip.text = element_text(size = 14),
+         plot.title = element_blank())
+
+Exp
+#dev.off
+
+```
+### PMA treated samples only and clustering by SkinType and Volunteer_IDidual
+
+```{r}
+
+SkinType <- data.frame(F =1, "Pr(>F)"=2, check.names = FALSE)
+Ind <- SkinType
+
+sub <- subset_samples(physeq, PMA_treated=="PMA")
+
+plist <- vector("list", length(dist_methods))
+names(plist) = dist_methods
+for( i in dist_methods ){
+  i
+    # Calculate distance matrix
+    iDist <- distance(sub, method=i)
+    # Calculate ordination
+    iMDS  <- ordinate(sub, "MDS", distance=iDist)
+    ## Make plot
+    # Don't carry over previous plot (if error, p will be blank)
+    p <- NULL
+    # Create plot, store as temp variable, p
+    p <- plot_ordination(sub, iMDS, color="Volunteer_ID", shape="Skin_Type")
+    # Add title to each plot
+    p <- p + ggtitle(paste("MDS using distance method ", i, sep=""))
+    # Save the graphic to file.
+    plist[[i]] = p
+    SkinType <- rbind(SkinType,  as.data.frame(adonis2(iDist ~ (sample_data(sub)$Skin_Type))[1, c(4,5)]))
+    Ind <- rbind(Ind,  as.data.frame(adonis2(iDist ~ (sample_data(sub)$Volunteer_ID))[1, c(4,5)]))
+    #Med <- rbind(Med,  as.data.frame(adonis2(iDist ~ (sample_data(physeq)$Media))[1, c(4,5)]))
+}
+
+SkinType <- SkinType[-1, ]
+Ind <- Ind[-1, ]
+
+
+df = ldply(plist, function(x) x$data)
+names(df)[1] <- "distance"
+df$distance <- ordered(df$distance, levels =unique(df$distance))
+p = ggplot(df, aes(Axis.1, Axis.2, color= ordered(Volunteer_ID, levels = c(1:12)), shape=Skin_Type)) + scale_color_manual("Volunteer_ID", values = indiv_colors_RPCA)
+p = p + geom_point(size=3)
+p = p + facet_wrap(~distance, scales="free", nrow = 2)
+p = p + ggtitle("MDS on various distance metrics for Enterotype dataset")
+
+
+rownames(SkinType) <- dist_methods
+colnames(SkinType) <- paste("SkinType_", colnames(SkinType))
+
+rownames(Ind) <- dist_methods
+colnames(Ind) <- paste("Volunteer_IDidual_", colnames(Ind))
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/beta_diversity_brayjaccard_PMA.tiff", units="in", width=5, height=5, res=300)
+p + theme_bw() + theme(axis.text = element_text(size = 10), axis.title = element_text(size = 12),
+         legend.text = element_text(size = 12), legend.title = element_text(size = 16), strip.text = element_text(size = 14),
+         plot.title = element_blank())
+dev.off
+
+cbind(SkinType, Ind)
+
+# write.csv(cbind(Exp, Med, Cond), "/media/deepan/Deepan/skin_comm/PERMANOVA_all_beta_distances.csv", sep = ",", row.names = TRUE, col.names = TRUE)
+
+```
+
+### Raw samples only and clustering by SkinType and Volunteer_IDidual
+
+```{r}
+
+SkinType <- data.frame(F =1, "Pr(>F)"=2, check.names = FALSE)
+Ind <- SkinType
+
+sub <- subset_samples(physeq, PMA_treated=="Raw")
+
+metadata
+
+plist <- vector("list", length(dist_methods))
+names(plist) = dist_methods
+for( i in dist_methods ){
+  i
+    # Calculate distance matrix
+    iDist <- distance(sub, method=i)
+    # Calculate ordination
+    iMDS  <- ordinate(sub, "MDS", distance=iDist)
+    ## Make plot
+    # Don't carry over previous plot (if error, p will be blank)
+    p <- NULL
+    # Create plot, store as temp variable, p
+    p <- plot_ordination(sub, iMDS, color="Volunteer_ID", shape="Skin_Type")
+    # Add title to each plot
+    p <- p + ggtitle(paste("MDS using distance method ", i, sep=""))
+    # Save the graphic to file.
+    plist[[i]] = p
+    SkinType <- rbind(SkinType,  as.data.frame(adonis2(iDist ~ (sample_data(sub)$Skin_Type))[1, c(4,5)]))
+    Ind <- rbind(Ind,  as.data.frame(adonis2(iDist ~ (sample_data(sub)$Volunteer_ID))[1, c(4,5)]))
+    #Med <- rbind(Med,  as.data.frame(adonis2(iDist ~ (sample_data(physeq)$Media))[1, c(4,5)]))
+}
+
+SkinType <- SkinType[-1, ]
+Ind <- Ind[-1, ]
+
+
+df = ldply(plist, function(x) x$data)
+names(df)[1] <- "distance"
+df$distance <- ordered(df$distance, levels =unique(df$distance))
+p = ggplot(df, aes(Axis.1, Axis.2, color=ordered(Volunteer_ID, levels = c(1:12)), shape=Skin_Type)) + scale_color_manual("Volunteer_ID", values = indiv_colors_RPCA)
+p = p + geom_point(size=3)
+p = p + facet_wrap(~distance, scales="free", nrow = 2)
+p = p + ggtitle("MDS on various distance metrics for Enterotype dataset")
+
+
+rownames(SkinType) <- dist_methods
+colnames(SkinType) <- paste("SkinType_", colnames(SkinType))
+
+rownames(Ind) <- dist_methods
+colnames(Ind) <- paste("Ind", colnames(Ind))
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/beta_diversity_brayjaccard_raw.tiff", units="in", width=5, height=5, res=300)
+p + theme_bw() + theme(axis.text = element_text(size = 10), axis.title = element_text(size = 12), axis.text.x = element_text(angle = 30),
+         legend.text = element_text(size = 12), legend.title = element_text(size = 16), strip.text = element_text(size = 14),
+         plot.title = element_blank())
+dev.off
+
+cbind(SkinType, Ind)
+
+# write.csv(cbind(Exp, Med, Cond), "/media/deepan/Deepan/skin_comm/PERMANOVA_all_beta_distances.csv", sep = ",", row.names = TRUE, col.names = TRUE)
+
+```

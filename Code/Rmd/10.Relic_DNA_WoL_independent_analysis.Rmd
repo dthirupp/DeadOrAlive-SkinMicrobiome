@@ -1,0 +1,282 @@
+---
+title: "10. Relic_DNA_fromWoL"
+author: "Deepan"
+date: "1/17/2025"
+output: html_document
+---
+---
+title: "9. Relic_DNA_estimation"
+author: "Deepan"
+date: "1/14/2025"
+output: html_document
+---
+
+## Load libraries
+
+```{r, message = FALSE}
+# Packages I commonly use
+# install.packages("stringr")
+# install.packages("ggplot2")
+# install.packages("reshape")
+# install.packages("reshape2")
+# install.packages("gplots")
+# install.packages("FactoMineR")
+# install.packages("factoextra")
+library(stringr)
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+library(reshape)
+library(reshape2)
+library(gplots)
+library(RColorBrewer)
+```
+
+## Define color vectors
+
+```{r}
+
+bpart_colors <- c("darkgoldenrod", "lightskyblue3", "indianred")
+
+indiv_colors_RPCA <- c("1" = "firebrick4", "2" = "darkolivegreen", "3" = "midnightblue", "4" = "coral1", "5" = "lightpink1", "6" = "lightskyblue3", "7" = "goldenrod1", "8" = "sienna3", "9" = "olivedrab4", "10" = "slateblue2", "11" = "burlywood4", "12" = "aquamarine4")
+
+indiv_colors <- c("firebrick4", "darkolivegreen", "midnightblue", "coral1", "lightpink1", "lightskyblue3",  "goldenrod1", "sienna3", "olivedrab4", "slateblue2", "burlywood4", "aquamarine4")
+                  
+bpart_colors_RPCA <- c("Sebaceous" = "darkgoldenrod", "Moist" = "lightskyblue3", "Dry" = "indianred")
+
+vec_col0 <- c("indianred"  ,  "gold"      ,    "rosybrown4"  ,   "powderblue"      ,     "lightsteelblue2"     ,     "lightpink"   ,   "darkseagreen4" , "palegreen"  ,    "peachpuff3" , "khaki4"    ,     "orchid4" , "darkolivegreen", "rosybrown3"  ,   "palevioletred2" ,
+              "darkorange1"    ,      "paleturquoise3" , "khaki"     ,     "dodgerblue4" ,   "sienna2"    ,    "darkgreen"   ,   "lightsalmon"  ,  "orchid2" ,   "lightsteelblue4"  ,   "lightsalmon2" ,  "lemonchiffon3"  , "honeydew"  ,   "sienna4"   ,  "darkolivegreen2"    ,    "gold1", "ivory3")
+
+```
+
+## plotting themes and functions
+
+```{r}
+
+theme_boxp <- function(){
+  
+  font <- "Times New Roman"
+  
+  theme_minimal() %+replace%
+    
+    theme(axis.title.y = element_text(angle = 90, size = 10), 
+          axis.title.x = element_blank(),   
+          axis.text.x = element_text(angle = 45, size = 10, color = "black"), 
+          axis.text.y = element_text(size = 10, color = "black"), 
+          
+          panel.background = element_rect(fill = "white"),  
+          axis.line.x = element_line(color = "black"), 
+          axis.line.y = element_line(color = "black"), 
+          
+          legend.text = element_text(size = 10, lineheight = 0.6), 
+          legend.spacing.y = unit(0.6, "mm"), 
+          legend.key.height = unit(2, "mm"), 
+          legend.key=element_rect(fill="white", color="black", linewidth = 0), 
+          legend.title = element_blank(), 
+          strip.background = element_rect(fill = NA, linetype = "solid", size = 1, colour = "black"), 
+          strip.text = element_text(size = 10, margin = margin(1,1,1,1)), 
+          panel.border = element_rect(fill = NA, size = 1),
+          panel.spacing.y = unit(1,"line"),
+    )
+}
+
+theme_pca <- function(){
+  
+  font <- "Times New Roman"
+  
+  theme_boxp() %+replace%
+    
+    theme(legend.position = "none", 
+          axis.title.y = element_text(angle = 90, size = 12, color = "black"),
+          axis.title.x = element_text(size = 12, color = "black"),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10),
+          )
+}
+
+lm_eqn <- function(df){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+
+```
+
+## Load WoL feature table (swab_blank and host filtered. No coverage filter. So cannot trust the taxonomies. Using only for alpha and beta diversities.
+
+## no coverage because relic-DNA here could include any noise! Including stuff that is just DNA from somewhere else settling on the skin. So we don't want to limit to only complete cells. 
+
+## not sure if this can be then compared to the PERMANOVA on individual grouping of the samples that were aligned to a 60% coverage thershold SMGC database.
+
+```{r}
+
+
+df <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/WoL_paired_table.tsv", check.names = FALSE, skip = 1)
+
+passed_samples <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/paired_samples.txt")[, 1]
+
+## formatting
+
+df[, -1] <- sapply(df[, -1], as.numeric)
+
+colnames(df) <- str_split(colnames(df), "_S", simplify = TRUE)[, 1]
+
+colnames(df) <- str_replace(colnames(df), "_PMA", "-PMA")
+
+colnames(df) <- str_replace(colnames(df), "1bis-", "12-")
+
+
+lengths <- read.delim2("/media/deepan/Deepan/WoL/wolr1_maps/genomes/metadata.tsv", check.names = FALSE)[, c(1, 37)]
+
+df <- merge(df, lengths, by.x = "#OTU ID", by.y = "#genome")
+
+```
+
+## removing samples less than 0.5M reads in sequencing depth after quality, swab, blank and host filtereing from the SMGC alignment to keep things consistent (because mapping fractions are different and WoL had slightly higher mapping percentage for some samples)
+
+```{r}
+
+df <- df[ ,colnames(df) %in% c(passed_samples, "#OTU ID", "total_length")]
+
+```
+
+
+## Genome-length normalization
+
+```{r}
+
+
+df[, -1] <- apply(df[, -1], 2, function(x) x/df$total_length)
+
+df <- df[, -ncol(df)]
+
+colnames(df)
+
+```
+
+## Computing relic-DNA proportion: relic-DNA proportion = Reads(OTU)raw - [R.A.(OTU)pma * (Total Reads Raw)]. And if less than 0, assuming no relic-DNA for that taxa
+
+
+```{r}
+
+pma <- df[, str_detect(colnames(df), "-PMA|#OTU")]
+
+pma[, -1] <- apply(pma[, -1], 2, function(x) (x/sum(x))*1e6)
+
+colnames(pma) <- str_replace(colnames(pma), "-PMA", "")
+
+df2 <- df[ ,!str_detect(colnames(df), "-PMA") ]
+
+df2 <- df2[, colnames(df2) %in% colnames(df)]
+pma <- pma[, colnames(pma) %in% colnames(df2)]
+
+pma <- pma[, c(colnames(pma))]
+
+sum(pma$`1-UB`)
+
+```
+
+
+```{r}
+
+# Function to apply (df1[column1] - df1[column1]*df2[column1])
+apply_function <- function(df1, df2) {
+  result_df <- data.frame(matrix(ncol = ncol(df1), nrow = nrow(df1)))
+  
+  # Loop through each column
+  for (col in names(df1)) {
+    result_df[[col]] <- df1[[col]] - (sum(df1[[col]]) * df2[[col]])
+  }
+  
+  return(result_df[, c(-1:-ncol(df1))])
+}
+
+# Apply the function
+result_df <- apply_function(df2[,-1], pma[,-1])
+
+result_df <- cbind(result_df, pma[, 1])
+
+colnames(result_df)[ncol(result_df)] <- "Taxa"
+
+result_df <- result_df[, c(ncol(result_df), 1:(ncol(result_df)-1))]
+
+result_df[, -1] <- apply(result_df[, -1], 2, function(x) ifelse(x < 0, 0, x))
+
+sum(result_df$`1-FH`)
+
+df <- result_df
+
+#write.table( df, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/Final_rpca_relic.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
+
+
+df[, -1] <- apply( df[, -1], 2, function(x) x/sum(x)*1e6)
+
+sum(df$`1-UB`)
+
+```
+
+## NMDS and RPCA
+
+```{r}
+library(vegan)
+
+metadata <- read.table("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/metadata.csv",
+                    sep=",", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    na.strings = "",
+                    check.names = FALSE, 
+                    comment.char = "")
+
+for_pca <- df
+
+df_t <- as.data.frame(t(for_pca[-1]), stringsAsFactors = FALSE); colnames(df_t) <- for_pca$`Taxa`; rownames(df_t) <- colnames(for_pca)[-1]
+
+for_pca <- df_t
+
+nmds <- metaMDS(for_pca, distance = "robust.aitchison", k = 2, trymax = 50)
+plot(nmds)
+
+nmds_scores <- as.data.frame(scores(nmds, display = "sites"))
+nmds_scores$Sample <- rownames(nmds_scores)  # Add sample IDs if needed
+
+# Merge with metadata
+
+nmds_scores <- merge(nmds_scores, metadata, by = "Sample")
+
+nmds$stress
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Relic-DNA_NMDS_WoL.tiff", units="in", width=4, height=4, res=300)
+ggplot(nmds_scores, aes(x = NMDS1, y = NMDS2, fill = Volunteer_ID)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_text(label = paste("stress value =", round(nmds$stress, 2)), x = -10, y = -14, size = 4, color = "grey30") +
+  geom_point(size = 4, pch = 21) +
+  scale_fill_manual(values = indiv_colors_RPCA) +
+  labs(title = "NMDS of relic-DNA proportion", x = "NMDS1", y = "NMDS2") +
+  theme_pca()
+#dev.off()
+
+
+dist_matrix <- vegdist(for_pca, method = "robust.aitchison")
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Relic-DNA_NMDS_distance_hist_WoL.tiff", units="in", width=4, height=4, res=300)
+hist(as.numeric(dist_matrix), main = "Distribution of Pairwise Distances", xlab = "Distance")
+#dev.off()
+
+print(adonis2(dist_matrix ~ Volunteer_ID, data = metadata[metadata$Sample %in% rownames(for_pca),], method = "robust.aitchison"))
+print(adonis2(dist_matrix ~ Skin_Type, data = metadata[metadata$Sample %in% rownames(for_pca),], method = "robust.aitchison"))
+
+print(adonis2(dist_matrix ~ BodySite_ID, data = metadata[metadata$Sample %in% rownames(for_pca),], method = "robust.aitchison"))
+
+```
+
+
+
+
+
+

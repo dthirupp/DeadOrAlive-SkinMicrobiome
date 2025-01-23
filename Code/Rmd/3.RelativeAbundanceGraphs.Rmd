@@ -1,0 +1,812 @@
+---
+title: "3.RelativeAbundanceGraphs"
+author: "Deepan"
+date: "12/27/2024"
+output: html_document
+---
+
+## Load libraries
+
+```{r, message = FALSE}
+# Packages I commonly use
+# install.packages("stringr")
+# install.packages("ggplot2")
+# install.packages("reshape")
+# install.packages("reshape2")
+# install.packages("gplots")
+# install.packages("FactoMineR")
+# install.packages("factoextra")
+library(stringr)
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+library(reshape)
+library(reshape2)
+library(gplots)
+library(RColorBrewer)
+library(dplyr)
+library(tidyr)
+```
+
+## Define color vectors
+
+```{r}
+
+bpart_colors <- c("darkgoldenrod", "lightskyblue3", "indianred")
+
+indiv_colors_RPCA <- c("1" = "firebrick4", "2" = "darkolivegreen", "3" = "midnightblue", "4" = "coral1", "5" = "lightpink1", "6" = "lightskyblue3", "7" = "goldenrod1", "8" = "sienna3", "9" = "olivedrab4", "10" = "slateblue2", "11" = "burlywood4", "12" = "aquamarine4")
+
+indiv_colors <- c("firebrick4", "darkolivegreen", "midnightblue", "coral1", "lightpink1", "lightskyblue3",  "goldenrod1", "sienna3", "olivedrab4", "slateblue2", "burlywood4", "aquamarine4")
+                  
+bpart_colors_RPCA <- c("Sebaceous" = "darkgoldenrod", "Moist" = "lightskyblue3", "Dry" = "indianred")
+
+vec_col0 <- c("indianred"  ,  "gold"      ,    "rosybrown4"  ,   "powderblue"      ,     "lightsteelblue2"     ,     "lightpink"   ,   "darkseagreen4" , "palegreen"  ,    "peachpuff3" , "khaki4"    ,     "orchid4" , "darkolivegreen", "rosybrown3"  ,   "palevioletred2" ,
+              "darkorange1"    ,      "paleturquoise3" , "khaki"     ,     "dodgerblue4" ,   "sienna2"    ,    "darkgreen"   ,   "lightsalmon"  ,  "orchid2" ,   "lightsteelblue4"  ,   "lightsalmon2" ,  "lemonchiffon3"  , "honeydew"  ,   "sienna4"   ,  "darkolivegreen2"    ,    "gold1", "ivory3")
+
+```
+
+## plotting themes and functions
+
+```{r}
+
+theme_bp <- function(){
+  
+  font <- "Times New Roman"
+  
+  theme_minimal() %+replace%
+    
+    theme(axis.title.y = element_text(angle = 90, size = 15), 
+          axis.title.x = element_blank(),   
+          axis.text.x = element_text(vjust = 1, size = 12, color = "black"), 
+          axis.text.y = element_text(size = 12, color = "black"), 
+          
+          panel.background = element_rect(fill = "white"),  
+          axis.line.x = element_line(color = "black"), 
+          axis.line.y = element_line(color = "black"), 
+          
+          legend.text = element_text(size = 12, lineheight = 0.6, face = "italic"), 
+          legend.spacing.y = unit(0.6, "mm"), legend.key.height = unit(2, "mm"), 
+          legend.key=element_rect(fill="white"), 
+          legend.title = element_blank(), 
+          strip.background = element_rect(fill = NA, linetype = "solid", size = 1, colour = "black"), 
+          strip.text = element_text(size = 15, margin = margin(1,1,1,1)), panel.border = element_rect(fill = NA, size = 1)
+          #panel.spacing.y = unit(1,"line"))
+    )
+}
+
+theme_boxp <- function(){
+  
+  font <- "Times New Roman"
+  
+  theme_minimal() %+replace%
+    
+    theme(axis.title.y = element_text(angle = 90, size = 10), 
+          axis.title.x = element_blank(),   
+          axis.text.x = element_text(angle = 45, size = 10, color = "black"), 
+          axis.text.y = element_text(size = 10, color = "black"), 
+          
+          panel.background = element_rect(fill = "white"),  
+          axis.line.x = element_line(color = "black"), 
+          axis.line.y = element_line(color = "black"), 
+          
+          legend.text = element_text(size = 10, lineheight = 0.6), 
+          legend.spacing.y = unit(0.6, "mm"), 
+          legend.key.height = unit(2, "mm"), 
+          legend.key=element_rect(fill="white", color="black", linewidth = 0), 
+          legend.title = element_blank(), 
+          strip.background = element_rect(fill = NA, linetype = "solid", size = 1, colour = "black"), 
+          strip.text = element_text(size = 10, margin = margin(1,1,1,1)), 
+          panel.border = element_rect(fill = NA, size = 1),
+          panel.spacing.y = unit(1,"line"),
+    )
+}
+
+theme_pca <- function(){
+  
+  font <- "Times New Roman"
+  
+  theme_boxp() %+replace%
+    
+    theme(legend.position = "none", 
+          axis.title.y = element_text(angle = 90, size = 12, color = "black"),
+          axis.title.x = element_text(size = 12, color = "black"),
+          axis.text.x = element_text(size = 10), 
+          axis.text.y = element_text(size = 10),
+          )
+}
+
+lm_eqn <- function(df){
+    m <- lm(y ~ x, df);
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+         list(a = format(unname(coef(m)[1]), digits = 2),
+              b = format(unname(coef(m)[2]), digits = 2),
+             r2 = format(summary(m)$r.squared, digits = 3)))
+    as.character(as.expression(eq));
+}
+
+```
+
+
+## Load formatted dataframe
+
+```{r}
+
+df <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted.tsv", check.names = FALSE)
+
+smgc <- read.delim2("/media/deepan/Deepan/SMGC/SMGC_bacteria_metadata.tsv", check.names = FALSE)[, c(1,2,15,16)]
+
+colnames(df)[1] <- "#genome"
+
+df[, -1] <- sapply(df[, -1], as.numeric)
+
+
+```
+
+
+
+## Renaming first column by the unique species name
+
+```{r}
+
+smgc$Taxa <- ifelse ( smgc$gtdb_species == "s__", smgc$gtdb_genus, smgc$gtdb_species )
+
+df <- merge(df, smgc[, c(-3, -4)], by = "#genome")
+
+df <- df[ , c ( ncol(df), 1, 2:(ncol(df) -1) )]
+
+```
+
+##removing samples less than 0.5M reads in sequencing depth after quality, swab, blank and host filtereing
+
+```{r}
+
+temp <- as.data.frame(colSums(df[ , c(-1, -2, -ncol(df))]))
+
+temp$sample <- rownames(temp)
+
+temp$Bs <- str_split(temp$sample, "-", simplify = TRUE)[, 2]
+
+temp <- temp[order(temp$Bs), ]
+
+temp$sample <- sapply(temp$sample, as.factor)
+
+temp <- temp[order(ordered(temp$Bs, levels = c("Abd", "FA", "AC", "PC", "UB", "FH"))), ]
+
+colnames(temp)[1] <- "SequencingDepth"
+
+ggplot(temp, aes( x = as.factor(sample), y = SequencingDepth, fill = SequencingDepth < 500000)) + geom_bar(stat = "identity") + scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "darkgray")) + theme(axis.text.x = element_text(angle = 90)) + labs(fill = "less than 0.5M", x = "sample", y = "total reads")
+
+df <- df[, !colnames(df)%in%c(as.character(temp$sample[temp$`colSums(df[, c(-1, -2, -ncol(df))])` < 500000])) ]
+
+passed_samples <- colnames(df[, c(-1, -2, -ncol(df))])
+
+write.table(passed_samples, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/paired_samples.txt", row.names = FALSE)
+
+write.table(temp[, -3], "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/sequencing_depth.tsv", sep  = "\t", quote = FALSE, row.names = FALSE)
+
+summary(temp$SequencingDepth)
+
+
+
+```
+
+## Reads per base-pair per million normalisation
+
+```{r}
+
+df[, c(-1, -2)] <- apply( df[, c(-1, -2)], 2, function(x) x/df$total_length) #dividing by the matching ref genome length to account for genome size bias
+
+df <- df[, -ncol(df)]
+
+write.table(df[, -1], "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted_genomelengthadjusted.tsv", row.names = FALSE, sep = "\t")
+
+df[, c(-1, -2)] <- apply( df[, c(-1, -2)], 2, function(x) x/sum(x)*1e6) #cpm to normalize across and account for read depth bias.
+
+sum(df$`1-UB`) #test using random sample
+
+write.table(df[, -1], "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted_genomelengthadjusted_cpm.tsv", row.names = FALSE, sep = "\t")
+
+df <- df[, -2]
+
+```
+
+## Formatting to aggregate by species only
+
+```{r}
+
+df$Taxa <- paste(str_split( df$Taxa, "_", simplify = TRUE)[ , 1], str_split( df$Taxa, "_", simplify = TRUE)[ , 3], sep = "_")
+
+df <- aggregate( df[, -1 ], by = list(df$Taxa), sum)
+
+```
+
+
+## Finding top species using median for plotting
+
+```{r}
+
+df$median <- apply( df[, -1], 1, median)
+
+df <- df[ order(df$median, decreasing = TRUE), ]
+
+#keep for plotting if median relative abundance across all samples is greater than 0.05% relative abundance
+
+df$Taxa <- ifelse( df$median > 500, df$Group.1, "other")
+
+df$Taxa <- ifelse( str_split(df$Taxa, "\\ ", simplify = TRUE)[ , 2] == "", "other", df$Taxa)
+
+df$Taxa <- str_replace(df$Taxa, "s_", "")
+
+df$Taxa <- ordered(df$Taxa, levels = c(df$Taxa[df$Taxa != "other"], "other"))
+
+df <- df[ order(df$Taxa), ]
+
+df <- df[, c(ncol(df), 2: (ncol(df)-1))]
+
+taxa_median_levels <- df[, c(1, ncol(df))]
+
+df <- df[, -ncol(df)]
+
+```
+
+## Exporting this feature table as sorted abundance table
+
+```{r}
+
+write.table( unique(df$Taxa), "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/taxa_levels.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
+
+write.table( df, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted_RPKM_sorted.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
+
+write.table( taxa_median_levels, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_alltaxa_medianRPKM.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
+
+```
+
+
+## Formatting for relative abundance bar plots
+
+```{r}
+
+df <- melt(df)
+
+df$Treatment <- ifelse( str_split(df$variable, "-", simplify = TRUE)[, 3] == "", "Raw", "PMA")
+
+df$Ind <- str_split(df$variable, "-", simplify = TRUE)[, 1]
+
+df$BodySite <- str_split(df$variable, "-", simplify = TRUE)[, 2]
+
+df$SkinType <- ifelse( df$BodySite %in% c( "FH", "UB"), "Sebaceous",
+                        ifelse( df$BodySite %in% c( "AC", "PC"), "Moist", "Dry"))
+
+```
+
+##bar plots for relative abundance
+
+```{r}
+
+ggplot( aggregate( df[, 3], by = list(df$BodySite, df$Taxa, df$Treatment, df$SkinType), median) ) +
+  geom_bar(
+    aes( x = Group.1,
+         y = x, fill = Group.2), position = "fill", stat = "identity") +
+  facet_grid(~Group.3, switch = "x")   +
+  scale_fill_manual(values =  c(vec_col0[1:15], "grey")) +
+  theme_boxp() +
+  theme (legend.spacing.y = unit(2, "mm"), axis.text.x = element_text(size = 10, angle = 0), axis.title.x = element_text(size = 12, vjust = -1.2), axis.title.y = element_blank()) +
+  guides(fill = guide_legend(byrow = TRUE)) +
+  labs(x = "Body Site")
+
+ggplot( aggregate( df[, 3], by = list(df$SkinType, df$Taxa, df$Treatment), median) ) +
+  geom_bar(
+    aes( x = Group.1,
+         y = x, fill = Group.2), position = "fill", stat = "identity") +
+  facet_grid(~Group.3, switch = "x")   +
+  scale_fill_manual(values =  c(vec_col0[1:15], "grey")) +
+  theme_boxp() +
+  theme (legend.spacing.y = unit(2, "mm"), axis.text.x = element_text(size = 10, angle = 0), axis.title.x = element_text(size = 12, vjust = -1.2), axis.title.y = element_blank()) +
+  guides(fill = guide_legend(byrow = TRUE)) +
+  labs(x = "Skin Type")
+
+ggplot( aggregate( df[, 3], by = list(df$Ind, df$Taxa, df$Treatment, df$BodySite, df$SkinType), median) ) +
+  geom_bar(
+    aes( x = ordered(Group.1, levels = c(1:11)),
+         y = x, fill = Group.2), position = "fill", stat = "identity") +
+  facet_grid(~Group.3, switch = "x")   +
+  scale_fill_manual(values =  c(vec_col0[1:15], "grey")) +
+  theme_boxp() +
+  theme (legend.spacing.y = unit(2, "mm"), axis.text.x = element_text(size = 10, angle = 0), axis.title.x = element_text(size = 12, vjust = -1.2), axis.title.y = element_blank()) +
+  guides(fill = guide_legend(byrow = TRUE)) +
+  labs(x = "Individual")
+
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/RelativeAbuindance_allInd.tiff", units="in", width=12, height=6, res=300)
+ggplot( aggregate( df[, 3], by = list(df$Ind, df$Taxa, df$Treatment, df$BodySite, df$SkinType), median) ) +
+  geom_bar(
+    aes( x = ordered(Group.1, levels = c(1:12)),
+         y = x, fill = Group.2), position = "fill", stat = "identity") +
+  facet_wrap(~ordered(Group.4, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")) + Group.3)   +
+  scale_fill_manual(values =  c(vec_col0[1:15], "grey")) +
+  theme_boxp() +
+  theme (legend.spacing.y = unit(2, "mm"), axis.text.x = element_text(size = 10, angle = 0), axis.title.x = element_text(size = 12, vjust = -1.2), axis.title.y = element_blank(), legend.text = element_text(face = "italic"), panel.grid = element_blank(), strip.text = element_text(size = 12)) +
+  guides(fill = guide_legend(byrow = TRUE)) +
+  labs(x = "Individual")
+#dev.off()
+
+ggplot( aggregate( df[, 3], by = list(df$Ind, df$Taxa, df$Treatment, df$BodySite, df$SkinType), median) ) +
+  geom_bar(
+    aes( x = ordered(Group.4, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")),
+         y = x, fill = Group.2), position = "fill", stat = "identity") +
+  facet_wrap(~ordered(Group.1, levels = c(1:12)) + Group.3)   +
+  scale_fill_manual(values =  c(vec_col0[1:15], "grey")) +
+  theme_boxp() +
+  theme (legend.spacing.y = unit(2, "mm"), axis.text.x = element_text(size = 10, angle = 0), axis.title.x = element_text(size = 12, vjust = -1.2), axis.title.y = element_blank()) +
+  guides(fill = guide_legend(byrow = TRUE)) +
+  labs(x = "Body Site")
+
+```
+
+## Log ratio
+
+```{r}
+
+df_log <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted_genomelengthadjusted_cpm.tsv", check.names = FALSE)
+
+## SMGC_345 corresponds to C.scnes in the SMGC database. USing this for computing log ratios
+
+df_log[, -1] <- sapply(df_log[, -1], as.numeric)
+
+df_log <- merge(df_log, smgc[, c(1,5)], by = "#genome")
+
+df_log <- df_log[, c(ncol(df_log), 2:123)]
+
+df_log$Taxa <- str_split(df_log$Taxa, "__", simplify =TRUE)[, 2]
+
+df_log$Taxa <- str_split(df_log$Taxa, "_", simplify =TRUE)[, 1]
+
+#df_log[, -1] <- log(df_log[, -1] / c(df_log[df_log$Taxa == "Cutibacterium acnes", -1]) + 1)
+
+df_log$Taxa[!df_log$Taxa %in% taxa_median_levels$Taxa] <- "other"
+
+df_log$Taxa <- ordered(df_log$Taxa, levels = c(unique(as.character(taxa_median_levels$Taxa))))
+
+df_log <- df_log[order(df_log$Taxa),]
+
+df_log <- aggregate(df_log[, -1], by = list(df_log$Taxa), sum)
+
+```
+
+## statistic test
+
+```{r}
+
+# Helper function for Wilcoxon test and formatting results
+perform_wilcox_test <- function(data, group_col, value1_col, value2_col) {
+  results <- data.frame()
+  grouped_data <- data %>% group_by(!!sym(group_col))
+  
+  for (group_name in unique(grouped_data[[group_col]])) {
+    group_subset <- grouped_data %>% filter(!!sym(group_col) == group_name)
+    if (nrow(group_subset) > 1) {  # Skip if insufficient data
+      wilcox_result <- wilcox.test(group_subset[[value1_col]], group_subset[[value2_col]], paired = FALSE)
+      result_row <- data.frame(
+        Group = group_name,
+        N = nrow(group_subset),
+        PValue = p.adjust(wilcox_result$p.value, method = "fdr", nrow(group_subset))
+      )
+      results <- rbind(results, result_row)
+    }
+  }
+    results$group1 <- "PMA"
+  results$group2 <- "Raw"
+  results$PValue <- sapply(results$PValue, function(x) {
+    if (x <= 0.05) ifelse(x <= 0.01, ifelse(x <= 0.001, "***", "**"), "*") else "ns"
+  })
+  return(results)
+}
+
+  
+
+```
+
+
+
+```{r}
+
+plot <- melt(df_log[ !df_log$Group.1 %in% c( "other"), ]) %>%
+  mutate(Treatment = ifelse(str_split(variable, "-", simplify =TRUE)[, 3] == "", "Raw", "PMA")) %>%
+  mutate(Sample = str_split(variable, "-PMA", simplify =TRUE)[, 1]) %>%
+  mutate(BS = str_split(variable, "-", simplify =TRUE)[, 2]) %>%
+  mutate(Group = paste(Group.1, BS, sep = "_"))
+
+plot <- dcast(plot[, -2], Group.1+Sample+BS+Group~Treatment, value.var = "value")
+
+plot <- plot[complete.cases(plot),]
+
+
+results_Taxa <- perform_wilcox_test(plot, "Sample", "PMA", "Raw")
+
+library(ggpubr)
+library(cowplot)
+  
+ggplot(melt(plot), aes(y = value, x = variable)) + 
+    geom_boxplot() + 
+    geom_point(aes(color = BS)) + 
+    facet_wrap(~Group.1, nrow = 3) + 
+    geom_line(aes(group = Sample, color = BS)) + 
+  annotate("text", label = "ns", x = 1.5, y = 1e-5) +
+    theme_minimal(base_size = 14) +
+  scale_y_log10() +
+    theme(
+    panel.spacing = unit(1, "lines"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8), # Facet borders
+    strip.text.x = element_text(size = 12, face = "bold"),
+    strip.text.y = element_text(size = 12, face = "bold", angle = 0),
+    axis.text.x = element_text(angle = 30, hjust = 1, colour = "black"),
+    axis.text.y = element_text(colour = "black"),
+    axis.title.x = element_blank(),
+    legend.position = "none"
+  ) 
+  
+  stat_pvalue_manual(results_Taxa, label = "PValue", hide.ns = TRUE, y.position = 6)
+
+```
+
+
+```{r}
+results_Taxa
+
+```
+
+
+## preferential abundance
+
+```{r}
+
+df_agg <- aggregate(df[ , c(3)], by = list(df$Taxa, df$BodySite, df$Treatment), mean, na.rm=TRUE)
+
+df_agg <- df_agg[df_agg$Group.1 != "other", ]
+
+df_agg$Group.1 <- ordered(df_agg$Group.1, levels = c(unique(taxa_median_levels$Taxa)))
+
+# ggplot(melt(df_agg), aes( x = Group.2, y = Group.1, fill = value)) +
+#   geom_tile() +
+#   facet_wrap(~variable)
+
+# Melt the data for easy plotting
+df_long <- df_agg
+
+# Normalize each row (z-score across variables)
+df_long <- df_long %>%
+  group_by(Group.1, Group.3) %>% 
+  mutate(z_score = (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)) %>%
+  ungroup()
+
+# Plot with z-scores and facets
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/RelativeAbundanceHeatmapTaxa_byBodySite.tiff", units="in", width=7, height=5, res=300)
+ggplot(df_long, aes(x = ordered(Group.2, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")), y = Group.1, fill = z_score)) +
+  geom_tile(color = "black", size = 0.2) +
+  facet_wrap(~ordered(Group.3, levels = c("Raw", "PMA"))) +
+  scale_fill_gradientn(
+    colors = rev(brewer.pal(n = 11, name = "RdBu")),
+    limits = c(min(df_long$z_score), max(df_long$z_score)),
+    name = "Z-Score"
+  ) +
+  scale_y_discrete(limits = rev) +
+  labs(x = "Body Site", y = "", title = "Relative Abundance of Taxa across Body Sites") +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(face = "italic")
+  )
+#dev.off()
+
+```
+
+## Correlation between 1 and 12 (same volunteer from different timepoints)
+
+```{r}
+
+## Correlation between 1 and 12 samples
+
+df_112 <- df[df$Ind %in% c("1", "12"), c(1:6)]
+
+df_112 <- df_112[df_112$Taxa != "other", ]
+
+df_112$group <- paste(df_112$Taxa, df_112$BodySite, sep = "_") 
+
+df_112 <- df_112[, c(3,4, 5 ,7)]
+
+df_112$group <- paste(df_112$group, df_112$Treatment, sep = "_")
+
+df_112 <- dcast(df_112[, -2], group~Ind, value.var = "value")
+
+colnames(df_112)[-1] <- c("x", "y")
+
+df_112 <- df_112[complete.cases(df_112),]
+
+df_112$Taxa <- str_split(df_112$group, "_", simplify = TRUE)[, 1]
+
+df_112$BS <- str_split(df_112$group, "_", simplify = TRUE)[, 2]
+
+# Create the plot
+ggplot(df_112[str_detect(df_112$group, "_PMA"), ], aes(x = log(x), y = log(y))) +
+  # Scatter points with colored fill and black outline
+  geom_point(aes(color = Taxa, shape = BS), size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  # Custom color palette for Taxa
+  scale_color_manual(values = vec_col0[1:15]) +
+  # Minimal theme with adjusted text size
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (PMA Samples)",
+    subtitle = "Analysis of Relative Abundance Across Taxa",
+    x = "Volunteer 1 (1_tp1) [Log Relative Abundance]",
+    y = "Volunteer 12 (1_tp2) [Log Relative Abundance]",
+    color = "Taxa",
+    shape = "BS"
+  ) +
+  stat_cor(data = df_112[str_detect(df_112$group, "_PMA"), c(2,3)], aes(x = log(x), y = log(y)), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+  # Enhanced theme customization
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1) # Add border around the plot
+  )
+
+
+# Create the plot
+ggplot(df_112[str_detect(df_112$group, "_Raw"), ], aes(x = log(x), y = log(y))) +
+  # Scatter points with colored fill and black outline
+  geom_point(aes(color = Taxa, shape = BS), size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  # Custom color palette for Taxa
+  scale_color_manual(values = vec_col0[1:15]) +
+  # Minimal theme with adjusted text size
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (Raw Samples)",
+    subtitle = "Analysis of Relative Abundance Across Taxa",
+    x = "Volunteer 1 (1_tp1) [Log Relative Abundance]",
+    y = "Volunteer 12 (1_tp2) [Log Relative Abundance]",
+    color = "Taxa",
+    shape = "BS"
+  ) +
+  # Add regression equation text
+  geom_text(
+    x = log(10), y = log(100000),
+    label = lm_eqn(df_112[str_detect(df_112$group, "_Raw"), c(2, 3)]),
+    parse = TRUE, hjust = 0, size = 4, color = "black"
+  ) +
+  # Enhanced theme customization
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1) # Add border around the plot
+  )
+
+
+```
+
+
+
+## Making PCA from all the data
+
+```{r}
+
+df <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted_genomelengthadjusted.tsv", check.names = FALSE)
+
+metadata <- read.table("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/metadata.csv",
+                    sep=",", 
+                    dec=".", 
+                    header = TRUE,
+                    stringsAsFactors = FALSE,
+                    na.strings = "",
+                    check.names = FALSE, 
+                    comment.char = "")
+
+metadata <- metadata[metadata$Sample %in% colnames(df[, -1]),]
+
+
+df[, -1] <- sapply(df[, -1], as.numeric)
+
+df[, -1] <- apply(df[, -1], 2, function(x) (x/sum(x))*1e6)
+
+sum(df$`1-AC-PMA`)
+
+df_t <- as.data.frame(t(df[-1]), stringsAsFactors = FALSE); colnames(df_t) <- df$`#genome`; rownames(df_t) <- colnames(df)[-1]
+
+for_pca <- df_t 
+ for_pca <- log(for_pca + 0.00000001) 
+
+  for_pca$Sample <- rownames(df_t)
+  
+  for_pca <- merge(for_pca, metadata[, 1:6], by = "Sample")
+  for_pca <- for_pca[, !colnames(for_pca) %in% c("Sample") ]
+  
+```
+
+## PCA with all samples
+
+```{r}
+
+ pca <- PCA(for_pca,
+            scale = FALSE,
+            quali.sup = c((ncol(for_pca)-4):ncol(for_pca))
+            )
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PCA_all_SkinType.tiff", units="in", width=4, height=4, res=300)
+ fviz_pca_ind(pca,
+            geom.ind = "point",
+             repel = TRUE,
+             habillage = ncol(for_pca),
+             addEllipses = TRUE,
+             ellipse.level = 0.95,
+             pointsize = 3,
+             palette = bpart_colors,
+             title = "PCA Analysis") +
+  theme_minimal(base_size = 14) +
+  labs(x = "PC1 (47.8% Variance Explained)",   # Custom axis labels
+       y = "PC2 (10.6% Variance Explained)") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+ #dev.off()
+ 
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PCA_all_treat.tiff", units="in", width=4, height=4, res=300)
+ fviz_pca_ind(pca,
+            geom.ind = "point",
+             repel = TRUE,
+             habillage = (ncol(for_pca)-2),
+             addEllipses = TRUE,
+             ellipse.level = 0.95,
+             pointsize = 3,
+             palette = rev(c("tomato4", "moccasin")),
+             title = "PCA Analysis") +
+  theme_minimal(base_size = 14) +
+  labs(x = "PC1 (47.8% Variance Explained)",   # Custom axis labels
+       y = "PC2 (10.6% Variance Explained)") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+#dev.off()
+
+```
+
+## PCA with PMA treated samples only
+
+```{r}
+
+ pca <- PCA(for_pca[for_pca$PMA_treated == "PMA",],
+            scale = FALSE,
+            quali.sup = c((ncol(for_pca)-4):ncol(for_pca))
+            )
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PCA_PMA_SkinType.tiff", units="in", width=4, height=4, res=300)
+ fviz_pca_ind(pca,
+            geom.ind = "point",
+             repel = TRUE,
+             habillage = ncol(for_pca),
+             addEllipses = TRUE,
+             ellipse.level = 0.95,
+             pointsize = 3,
+             palette = bpart_colors,
+             title = "PCA Analysis") +
+  theme_minimal(base_size = 14) +
+  labs(x = "PC1 (52.3% Variance Explained)",   # Custom axis labels
+       y = "PC2 (11.1% Variance Explained)") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+#dev.off()
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PCA_PMA_Ind.tiff", units="in", width=4, height=4, res=300)
+     fviz_pca_ind(pca,
+              geom.ind = "point",        # Use only points
+              pointshape = 16,           # Uniform solid circle shape
+              pointsize = 3,             # Uniform point size
+              repel = FALSE,             # Disable repel for a cleaner plot
+              habillage = (ncol(for_pca)-4),  # Color by a specific grouping
+              addEllipses = FALSE,       # No ellipses or centroids
+              palette = indiv_colors,    # Custom color palette
+              mean.point = FALSE,
+              title = "PCA Analysis") +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = "PC1 (52.3% Variance Explained)",   # Custom axis labels
+    y = "PC2 (11.1% Variance Explained)"
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+#dev.off()
+
+```
+
+## PCA with Raw samples only
+
+```{r}
+
+ pca <- PCA(for_pca[for_pca$PMA_treated == "Raw",],
+            scale = FALSE,
+            quali.sup = c((ncol(for_pca)-4):ncol(for_pca))
+            )
+
+# var_contrib <- get_pca_var(pca)$contrib  # Contributions of variables
+# top5_features <- c(names(sort(var_contrib[, 1], decreasing = TRUE)[1:2]), names(sort(var_contrib[, 1], decreasing = FALSE)[1:2]), names(sort(var_contrib[, 2], decreasing = TRUE)[1:2]), names(sort(var_contrib[, 2], decreasing = FALSE)[1:2]))  # Top 5 variables
+
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PCA_Raw_SkinType.tiff", units="in", width=4, height=4, res=300)
+ fviz_pca_ind(pca,
+            geom.ind = "point",
+             repel = TRUE,
+             habillage = ncol(for_pca),
+             addEllipses = TRUE,
+             ellipse.level = 0.95,
+             pointsize = 3,
+             palette = bpart_colors,
+             title = "PCA Analysis",
+             #select.var = list(name = top5_features)
+            ) +
+  theme_minimal(base_size = 14) +
+  labs(x = "PC1 (44.1% Variance Explained)",   # Custom axis labels
+       y = "PC2 (13.1% Variance Explained)") +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+#()
+ 
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PCA_Raw_Ind.tiff", units="in", width=4, height=4, res=300)
+   fviz_pca_ind(pca,
+              geom.ind = "point",        # Use only points
+              pointshape = 16,           # Uniform solid circle shape
+              pointsize = 3,             # Uniform point size
+              repel = FALSE,             # Disable repel for a cleaner plot
+              habillage = (ncol(for_pca)-4),  # Color by a specific grouping
+              addEllipses = FALSE,       # No ellipses or centroids
+              palette = indiv_colors,    # Custom color palette
+              mean.point = FALSE,
+              title = "PCA Analysis") +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = "PC1 (44.1% Variance Explained)",   # Custom axis labels
+    y = "PC2 (13.1% Variance Explained)"
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+#dev.off()
+
+
+```

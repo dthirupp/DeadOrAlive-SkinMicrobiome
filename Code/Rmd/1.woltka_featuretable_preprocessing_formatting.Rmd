@@ -1,0 +1,179 @@
+---
+title: "SMGC_biomfile_preprocessing"
+author: "Deepan"
+date: "12/18/2024"
+output: html_document
+---
+## Load libraries
+
+```{r, message = FALSE}
+# Packages I commonly use
+# install.packages("stringr")
+# install.packages("ggplot2")
+# install.packages("reshape")
+# install.packages("reshape2")
+# install.packages("gplots")
+# install.packages("FactoMineR")
+# install.packages("factoextra")
+library(stringr)
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+library(reshape)
+library(reshape2)
+library(gplots)
+library(RColorBrewer)
+```
+
+## Load the tsv file from woltka classify and make numeric
+
+```{r}
+
+df <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc.tsv", skip = 1, check.names = FALSE)
+
+df[, -1] <- sapply(df[, -1], as.numeric)
+
+```
+
+## Change the column names
+
+```{r}
+
+colnames(df) <- str_replace_all(colnames(df), "_PMA", "-PMA")
+colnames(df) <- str_split(colnames(df), "_S", simplify = TRUE)[,1]
+
+colnames(df) <- str_replace(colnames(df), "1bis-", "12-")
+
+```
+
+## Extract only the columns of 1 and 1bis for averaging
+
+```{r}
+# 
+# df_one <- df[ , str_detect( colnames(df), "#OTU|1-|1bis-")]
+# df_one <- df_one[,  !str_detect( colnames(df_one), "11-")]
+# 
+# #remove these columns from df
+# 
+# df <- df[ , colnames(df) %in% c("#OTU ID", colnames(df)[!colnames(df)%in%colnames(df_one)]) ]
+
+```
+
+## Function to keep only unique body-site volunteer 1 combos, or else calculate average [NOT DOING THIS ANYMORE]
+
+```{r}
+
+# Function to process the dataframe
+process_dataframe <- function(df) {
+  library(dplyr)
+
+  # Extract column names
+  col_names <- colnames(df)
+
+  # Parse patient numbers and body sites
+  parsed <- strcapture("^(\\d+)(bis)?-(.+)$", col_names, data.frame(Patient = character(), Bis = character(), Site = character()))
+  parsed$Bis[is.na(parsed$Bis)] <- ""  # Handle NAs for easier comparisons
+
+  # Group columns by patient and site
+  result <- df %>%
+    select(all_of(col_names)) %>%
+    {
+      # Loop through each unique combination of Patient and Site
+      unique_combinations <- unique(parsed[, c("Patient", "Site")])
+      purrr::map_dfc(1:nrow(unique_combinations), function(i) {
+        patient <- unique_combinations$Patient[i]
+        site <- unique_combinations$Site[i]
+
+        # Find relevant columns for this combination
+        cols_1 <- col_names[parsed$Patient == patient & parsed$Site == site & parsed$Bis == ""]
+        cols_bis <- col_names[parsed$Patient == patient & parsed$Site == site & parsed$Bis == "bis"]
+
+        if (length(cols_1) > 0 && length(cols_bis) > 0) {
+          # Case: Both 1 and 1bis exist -> Replace with average
+          colname <- paste0(patient, "-", site)
+          tibble(!!colname := rowMeans(select(., all_of(c(cols_1, cols_bis)))))
+        } else if (length(cols_1) == 0 && length(cols_bis) > 0) {
+          # Case: Only 1bis exists -> Rename to 1
+          colname <- paste0(patient, "-", site)
+          rename(select(., all_of(cols_bis)), !!colname := everything())
+        } else if (length(cols_1) > 0 && length(cols_bis) == 0) {
+          # Case: Only 1 exists -> Keep as is
+          select(., all_of(cols_1))
+        }
+      })
+    }
+
+  result
+}
+
+# # Process the dataframe
+# processed_df <- cbind(process_dataframe(df_one[,-1]), df_one[,1])
+# processed_df <- processed_df[, c(ncol(processed_df), 1:(ncol(processed_df)-1))]
+# 
+# df_one <-processed_df
+# colnames(df_one)[1] <- "#OTU ID"
+
+```
+
+## Merging the processed df_one to make the correct, final tsv with all volunteers
+
+```{r}
+
+# df <- merge(df, df_one, by = "#OTU ID")
+
+```
+
+## Making the correct order of the dataframe
+
+```{r}
+
+colnames(df)
+
+col_order <- c( "#OTU ID", "1-FH",  "1-FH-PMA", "1-UB", "1-UB-PMA", "1-AC",  "1-AC-PMA", "1-PC-PMA", "1-FA-PMA", "1-Abd", "1-Abd-PMA", "2-FH", "2-FH-PMA", "2-UB", "2-UB-PMA", "2-AC", "2-AC-PMA", "2-PC", "2-PC-PMA", "2-FA", "2-FA-PMA","2-Abd", "2-Abd-PMA", "3-FH", "3-FH-PMA", "3-UB", "3-UB-PMA", "3-AC", "3-AC-PMA", "3-PC", "3-PC-PMA", "3-FA", "3-FA-PMA", "3-Abd", "3-Abd-PMA", "4-FH", "4-FH-PMA", "4-UB", "4-UB-PMA", "4-AC", "4-AC-PMA", "4-PC", "4-PC-PMA", "4-FA", "4-FA-PMA", "4-Abd", "4-Abd-PMA", "5-FH", "5-FH-PMA", "5-UB", "5-UB-PMA", "5-AC", "5-AC-PMA", "5-PC", "5-PC-PMA", "5-FA", "5-FA-PMA", "5-Abd", "5-Abd-PMA", "6-FH", "6-FH-PMA", "6-UB" ,"6-UB-PMA", "6-AC", "6-AC-PMA", "6-PC", "6-PC-PMA", "6-FA", "6-FA-PMA", "6-Abd", "6-Abd-PMA", "7-FH", "7-FH-PMA", "7-UB", "7-UB-PMA", "7-AC", "7-AC-PMA", "7-PC", "7-PC-PMA", "7-FA", "7-FA-PMA", "7-Abd", "7-Abd-PMA", "8-FH", "8-FH-PMA", "8-UB", "8-UB-PMA", "8-AC", "8-AC-PMA", "8-PC", "8-PC-PMA", "8-FA", "8-FA-PMA", "8-Abd", "8-Abd-PMA", "9-FH", "9-FH-PMA", "9-UB", "9-UB-PMA", "9-AC", "9-AC-PMA", "9-PC", "9-PC-PMA", "9-FA", "9-FA-PMA", "9-Abd", "9-Abd-PMA", "10-FH", "10-FH-PMA", "10-UB", "10-UB-PMA", "10-AC", "10-AC-PMA", "10-PC", "10-PC-PMA", "10-FA", "10-FA-PMA", "10-Abd", "10-Abd-PMA", "11-FH", "11-FH-PMA", "11-UB", "11-UB-PMA", "11-AC", "11-AC-PMA", "11-PC", "11-PC-PMA", "11-FA", "11-FA-PMA", "11-Abd", "11-Abd-PMA", "12-FH", "12-FH-PMA", "12-UB", "12-UB-PMA", "12-AC", "12-AC-PMA", "12-PC", "12-PC-PMA", "12-FA", "12-FA-PMA", "12-Abd", "12-Abd-PMA")
+
+col_order <- col_order[ col_order%in%c(colnames(df)) ]
+
+df <- df[, col_order]
+
+```
+
+## Exporting dataframes for RPCA in QIIME2
+
+```{r}
+
+write.table( df[, colnames(df) %in% c( "#OTU ID", colnames(df)[str_detect(colnames(df), "-PMA")])], "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/Final_rpca_pma.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
+
+write.table( df[, colnames(df) %in% c( "#OTU ID", colnames(df)[!str_detect(colnames(df), "-PMA")])], "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/Final_rpca_raw.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
+
+write.table( df, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/Final_rpca_all.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
+
+```
+
+## Keeping only samples that have matching Raw and PMA treated samples
+
+```{r}
+
+# samples <- c("#OTU ID", "1-AC-PMA", "1-AC", "1-FH-PMA", "1-FH", "1-UB-PMA", "1-UB", "2-AC-PMA", "2-AC", "2-FH-PMA", "2-FH", "2-UB-PMA", "2-UB", "3-FH-PMA", "3-FH", "3-PC-PMA", "3-PC", "3-UB-PMA", "3-UB", "4-AC-PMA", "4-AC", "4-FA-PMA", "4-FA", "4-FH-PMA", "4-FH", "4-PC-PMA", "4-PC", "4-UB-PMA", "4-UB", "5-AC-PMA", "5-AC", "5-FA-PMA", "5-FA", "5-PC-PMA", "5-PC", "5-UB-PMA", "5-UB", "6-AC-PMA", "6-AC", "6-FH-PMA", "6-FH", "6-PC-PMA", "6-PC", "6-UB-PMA", "6-UB", "7-FA-PMA", "7-FA", "7-FH-PMA", "7-FH", "7-PC-PMA", "7-PC", "7-UB-PMA", "7-UB", "8-AC-PMA", "8-AC", "8-Abd-PMA",  "8-Abd",  "8-FA-PMA", "8-FA", "8-FH-PMA", "8-FH", "8-PC-PMA", "8-PC", "8-UB-PMA", "8-UB", "9-AC-PMA", "9-AC", "9-FH-PMA", "9-FH", "9-PC-PMA", "9-PC", "10-Abd-PMA", "10-Abd", "10-FA-PMA", "10-FA", "10-FH-PMA", "10-FH", "10-UB-PMA",  "10-UB",  "11-AC-PMA",  "11-AC", "11-FA-PMA", "11-FA",  "11-FH-PMA", "11-FH", "11-PC-PMA",  "11-PC",  "11-UB-PMA",  "11-UB")
+# 
+# 
+# df <- df[, colnames(df) %in% samples ]
+
+```
+
+
+## Export
+
+```{r}
+
+write.table(df, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted.tsv", row.names = FALSE, sep = "\t")
+
+```
+
+
+
+
+
+
+
+
+

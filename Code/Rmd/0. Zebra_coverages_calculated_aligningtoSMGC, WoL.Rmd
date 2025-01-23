@@ -1,0 +1,208 @@
+---
+title: "BMC_revision_LiveDead"
+author: "Deepan"
+date: "11/1/2024"
+output: html_document
+---
+
+#function to compute local minima in coverage density plots
+
+```{r}
+
+modes <- function(d){
+    i <- which(diff(sign(diff(d$y))) > 0) + 1
+    return(data.frame(x = d$x[i], y = d$y[i]))
+    return(data.frame(d$x[i[1]]))
+}
+
+annotate <- function(d){
+    i <- which(diff(sign(diff(d$y))) > 0) + 1
+    return(data.frame(d$x[i[1]]))
+}
+
+```
+
+
+## 1. Using SMGC database after swab. blank and human filtering
+
+```{r}
+
+zebra <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/SMGC_coverages.txt", header = TRUE)
+
+zebra[, 2:4] <- sapply(zebra[,2:4], as.numeric) 
+
+zebra <- zebra[order(zebra$coverage_ratio, decreasing = TRUE),]
+
+zebra$species <- ifelse( str_split(zebra$strain, ";", simplify = TRUE)[,7] == "s__",
+                         str_split(zebra$strain, ";", simplify = TRUE)[,6],  str_split(zebra$strain, ";", simplify = TRUE)[,7])
+
+zebra$genus <- str_split(zebra$strain, ";", simplify = TRUE)[,6]
+
+zebra <- zebra[, c(6, 7, 4, 2:3, 5, 1)]
+
+```
+
+#checking the cutoffs
+
+```{r}
+
+
+summary(zebra$coverage_ratio)
+
+# Compute density and mode
+density_data <- density(zebra$coverage_ratio)
+mode_value <- modes(density_data)$x[1]  # Extract the first mode
+
+# Plot
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Zebra_coverage_SMGC_afterswabblankhostremoved.tiff", units="in", width=8, height=5, res=300)
+ggplot(zebra, aes(x = coverage_ratio)) + 
+  geom_density(color = "blue", fill = "blue", alpha = 0.3, size = 1) +  # Density line
+  geom_vline(xintercept = mode_value, color = "red", linetype = "dashed", size = 1) +  # Vertical line at mode
+  geom_text(
+    aes(x = mode_value + 0.05, y = max(density_data$y) * 0.5, label = paste("global minima:", round(mode_value, 3))),
+    color = "red",
+    angle = 90,
+    vjust = -0.5,
+    size = 5
+  ) +
+  #scale_x_log10() +  # Uncomment if necessary for log scaling
+  labs(
+    title = "Coverages of identified features in samples aligned to SMGC",
+    subtitle = "After removal of swab, blank, and human reads",
+    x = "Coverage Ratio",
+    y = ""
+  ) +
+  theme_minimal(base_size = 12) +
+  theme_boxp() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5), 
+    axis.text.x = element_text(color = "black", angle = 0, size = 12),
+    axis.text.y = element_text(color = "black", angle = 0, size = 12)
+  )
+dev.off()
+
+
+```
+## Export this filtered list for samfile cleanup. 
+
+```{r}
+
+unique(zebra$genus[ zebra$coverage_ratio > 0.60]) 
+
+zebra <- zebra[zebra$coverage_ratio > 0.60,]
+
+zebra <- zebra[, c(7, 4, 5, 3, 6)]
+
+#write.table(zebra, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/SMGC_60perc_covered_genomes.txt", row.names = FALSE, quote = FALSE, sep = "\t")
+
+```
+
+## 2. Using Web Of Life database after swab, blank and human filtering
+
+```{r}
+
+zebra <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/WoL_coverages.txt", header = TRUE)
+
+zebra[, 2:4] <- sapply(zebra[,2:4], as.numeric) 
+
+zebra <- zebra[order(zebra$coverage_ratio, decreasing = TRUE),]
+
+```
+
+#checking the cutoffs for WoL alignment
+
+```{r}
+
+summary(zebra$coverage_ratio)
+
+# Compute density and mode
+density_data <- density(zebra$coverage_ratio)
+mode_value <- modes(density_data)$x[1]  # Extract the first mode
+
+# Plot
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Zebra_coverage_WoL_afterswabblankhostremoved.tiff", units="in", width=5, height=3, res=300)
+ggplot(zebra, aes(x = coverage_ratio)) + 
+  geom_density(color = "blue", fill = "blue", alpha = 0.3, size = 1) +  # Density line
+  geom_vline(xintercept = mode_value, color = "red", linetype = "dashed", size = 1) +  # Vertical line at mode
+  geom_text(
+    aes(x = mode_value + 0.05, y = max(density_data$y) * 0.9, label = round(mode_value, 3)),
+    color = "red",
+    angle = 90,
+    vjust = -0.5,
+    size = 4
+  ) +
+  #scale_x_log10() +  # Uncomment if necessary for log scaling
+  labs(
+    title = "Coverage Ratios in WoL Database",
+    subtitle = "Without removal of swab, blank, and human reads",
+    x = "Coverage Ratio",
+    y = "Density"
+  ) +
+  theme_minimal(base_size = 12) +  # Minimal theme with larger font
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+
+dev.off()
+
+#looking at the density plot, I want to pick my coverage as near the global minima. The global minima
+
+```
+
+## looking at the old zebra coverage for WoL allignment done without negative, swab and host removal
+
+
+```{r}
+
+zebra <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/BIOM_files/ZebraFilter/coverages.txt", header = TRUE)
+
+zebra[, 2:4] <- sapply(zebra[,2:4], as.numeric) 
+
+zebra <- zebra[order(zebra$coverage_ratio, decreasing = TRUE),]
+
+```
+
+#checking the cutoffs
+
+```{r}
+
+summary(zebra$coverage_ratio)
+
+# Compute density and mode
+density_data <- density(zebra$coverage_ratio)
+mode_value <- modes(density_data)$x[1]  # Extract the first mode
+
+# Plot
+
+tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Zebra_coverage_WoL_swabblankhostnotremoved.tiff", units="in", width=5, height=3, res=300)
+ggplot(zebra, aes(x = coverage_ratio)) + 
+  geom_density(color = "blue", fill = "blue", alpha = 0.3, size = 1) +  # Density line
+  geom_vline(xintercept = mode_value, color = "red", linetype = "dashed", size = 1) +  # Vertical line at mode
+  geom_text(
+    aes(x = mode_value + 0.05, y = max(density_data$y) * 0.9, label = round(mode_value, 3)),
+    color = "red",
+    angle = 90,
+    vjust = -0.5,
+    size = 4
+  ) +
+  #scale_x_log10() +  # Uncomment if necessary for log scaling
+  labs(
+    title = "Coverage Ratios in WoL Database",
+    subtitle = "Without removal of swab, blank, and human reads",
+    x = "Coverage Ratio",
+    y = "Density"
+  ) +
+  theme_minimal(base_size = 12) +  # Minimal theme with larger font
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+dev.off()
+
+```
+
+
