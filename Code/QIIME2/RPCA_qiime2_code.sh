@@ -1,3 +1,5 @@
+# This script, written for shell, is to be run after running the Pre-processing scripts, and the Rmd scripts 0, 1, 2.
+
 #Using qiime2 (qiime2-2022.11) RPCA feature via DEICODE plugin
 
 conda activate qiime2-2022.11
