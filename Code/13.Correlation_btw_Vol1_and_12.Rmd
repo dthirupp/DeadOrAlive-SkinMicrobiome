@@ -1,0 +1,471 @@
+---
+title: "Correlation_1_v_12"
+author: "Deepan"
+date: "4/29/2025"
+output: html_document
+---
+
+```{r}
+
+library(stringr)
+library(reshape2)
+library(ggplot2)
+library(ggpubr)
+
+```
+
+## Color vectors
+
+```{r}
+
+bpart_colors <- c("darkgoldenrod", "lightskyblue3", "indianred")
+
+indiv_colors_RPCA <- c("1" = "firebrick4", "2" = "darkolivegreen", "3" = "midnightblue", "4" = "coral1", "5" = "lightpink1", "6" = "lightskyblue3", "7" = "goldenrod1", "8" = "sienna3", "9" = "olivedrab4", "10" = "slateblue2", "11" = "burlywood4", "12" = "aquamarine4")
+
+indiv_colors <- c("firebrick4", "darkolivegreen", "midnightblue", "coral1", "lightpink1", "lightskyblue3",  "goldenrod1", "sienna3", "olivedrab4", "slateblue2", "burlywood4", "aquamarine4")
+
+vec_col0 <- c("Cutibacterium acnes" = "indianred"  , "Cutibacterium namnetense" =  "gold"      , "Cutibacterium humerusii"  = "rosybrown4"  , "Lawsonella clevelandensis" =  "powderblue"      ,   "Micrococcus luteus" =  "lightsteelblue2"     ,   "Cutibacterium granulosum"  = "lightpink"   ,  "Corynebacterium kefirresidentii" = "darkseagreen4" , "Cutibacterium avidum" = "palegreen"  ,  "Staphylococcus epidermidis" =  "peachpuff3" , "Actinomyces viscosus" = "khaki4"    ,  "Staphylococcus capitis" =   "orchid4" ,"Corynebacterium aurimucosum" = "darkolivegreen", "Corynebacterium pseudogenitalium" = "rosybrown3"  , "Streptococcus mitis" =   "palevioletred2" ,
+            "Brachybacterium paraconglomeratum" = "darkorange1"    ,      "paleturquoise3" , "khaki"     ,     "dodgerblue4" ,   "sienna2"    ,    "darkgreen"   ,   "lightsalmon"  ,  "orchid2" ,   "lightsteelblue4"  ,   "lightsalmon2" ,  "lemonchiffon3"  , "honeydew"  ,   "sienna4"   ,  "darkolivegreen2"    ,    "gold1", "ivory3")
+
+
+#sample order vector for paired analysis
+
+sample_order <- c("1-AC-PMA", "1-AC", "1-FH-PMA", "1-FH", "1-UB-PMA", "1-UB", "2-AC-PMA", "2-AC", "2-FH-PMA", "2-FH", "2-UB-PMA", "2-UB", "3-FH-PMA", "3-FH", "3-PC-PMA", "3-PC", "3-UB-PMA", "3-UB", "4-AC-PMA", "4-AC", "4-FA-PMA", "4-FA", "4-FH-PMA", "4-FH", "4-PC-PMA", "4-PC", "4-UB-PMA", "4-UB", "5-AC-PMA", "5-AC", "5-FA-PMA", "5-FA", "5-PC-PMA", "5-PC", "5-UB-PMA", "5-UB", "6-AC-PMA", "6-AC", "6-FH-PMA", "6-FH", "6-PC-PMA", "6-PC", "6-UB-PMA", "6-UB", "7-FA-PMA", "7-FA", "7-FH-PMA", "7-FH", "7-PC-PMA", "7-PC", "7-UB-PMA", "7-UB", "8-AC-PMA", "8-AC", "8-Abd-PMA",  "8-Abd",  "8-FA-PMA", "8-FA", "8-FH-PMA", "8-FH", "8-PC-PMA", "8-PC", "8-UB-PMA", "8-UB", "9-AC-PMA", "9-AC", "9-FH-PMA", "9-FH", "9-PC-PMA", "9-PC", "10-Abd-PMA", "10-Abd", "10-FA-PMA", "10-FA", "10-FH-PMA", "10-FH", "10-UB-PMA",  "10-UB",  "11-AC-PMA",  "11-AC", "11-FA-PMA", "11-FA",  "11-FH-PMA", "11-FH", "11-PC-PMA",  "11-PC",  "11-UB-PMA",  "11-UB")
+```
+
+
+```{r}
+
+counts <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/absolute_counts.tsv", check.names = FALSE, colClasses = c(Indiv = "character"))
+
+counts[, 2:6] <- sapply(counts[, 2:6], as.numeric)
+
+```
+
+
+
+```{r}
+
+df_112 <- counts[str_split(counts$Sample, "-", simplify = TRUE)[, 1] == "1" | str_split(counts$Sample, "-", simplify = TRUE)[, 1] == "12",]
+
+df_112 <- df_112[, c(1:3, 7, 8)]
+
+df_112$Indiv <- sapply(df_112$Indiv, as.character)
+
+df_112 <- melt(df_112)
+
+df_112$group <- paste(df_112$Body_Part, df_112$variable, sep = "_")
+
+df_112 <- dcast(df_112, group~Indiv, value.var = "value")
+
+df_112 <- df_112[complete.cases(df_112),]
+
+colnames(df_112)[-1] <- c("x", "y")
+
+df_112$BS <- str_split(df_112$group, "_", simplify = TRUE)[, 1]
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_Raw_flowcytometerresults.tiff", units="in", width=7, height=6, res=300)
+ggplot(df_112[str_detect(df_112$group, "_Raw"), ], aes(x = x, y = y, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
+  geom_point( size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE, method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (Raw Samples)",
+    subtitle = "Analysis of Cells per sq cm",
+    x = "Volunteer 1 (timepoint 1) (cells per sq cm)",
+    y = "Volunteer 1 (timepoint 2) (cells per sq cm)",
+    color = "Taxa",
+    shape = paste("BodySite",  "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_Raw")])), "samples from each tp)")
+  ) +
+ stat_cor(data = df_112[str_detect(df_112$group, "_Raw"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+   guides(
+    color = guide_legend(ncol = 1),
+    shape = guide_legend(ncol = 2) 
+  ) +
+    scale_y_log10() +
+  scale_x_log10() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+)
+#dev.off()
+
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_PMA_flowcytometerresults.tiff", units="in", width=7, height=6, res=300)
+ggplot(df_112[str_detect(df_112$group, "_PMA"), ], aes(x = x, y = y, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
+  geom_point(size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE,method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (PMA Samples)",
+    subtitle = "Analysis of Cells per sq cm",
+    x = "Volunteer 1 (timepoint 1) (cells per sq cm)",
+    y = "Volunteer 1 (timepoint 2) (cells per sq cm)",
+    color = "Taxa",
+    shape = paste("BodySite",  "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_PMA")])), "samples from each tp)")
+  ) +
+  # Add regression equation text
+  stat_cor(data = df_112[str_detect(df_112$group, "_PMA"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman", label.y = 6) +
+   guides(
+    color = guide_legend(ncol = 1),
+    shape = guide_legend(ncol = 2) 
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+)
+#dev.off()
+
+```
+
+## Taxa relative abundance correlation
+
+```{r}
+
+df <- read.delim2("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/skin_SMGC_Zebra60perc_formatted_RPKM_sorted.tsv", check.names = FALSE)
+
+df[, -1] <- sapply(df[, -1], as.numeric)
+
+df <- df[df$Taxa!="other", ]
+
+taxa_levels <- df$Taxa
+
+```
+
+```{r}
+
+df_112 <- melt(df)
+
+df_112 <- df_112[str_split(df_112$variable, "-", simplify = TRUE)[, 1] == "1" | str_split(df_112$variable, "-", simplify = TRUE)[, 1] == "12",]
+
+df_112$Ind <- str_split(df_112$variable, "-", simplify = TRUE)[, 1]
+
+df_112$BS <- str_split(df_112$variable, "-", simplify = TRUE)[, 2]
+
+df_112$Treatment <- str_split(df_112$variable, "-", simplify = TRUE)[, 3]
+
+df_112$Treatment <- ifelse(df_112$Treatment == "", "Raw", df_112$Treatment)
+
+df_112$group <- paste(df_112$Taxa, df_112$BS, df_112$Treatment, sep = "_") 
+
+df_112 <- df_112[, c(3, 4, 5, 7)]
+
+df_112 <- dcast(df_112, group~Ind, value.var = "value")
+
+colnames(df_112)[-1] <- c("x", "y")
+
+df_112$Taxa <- str_split(df_112$group, "_", simplify = TRUE)[, 1]
+
+df_112$Taxa <- ordered(df$Taxa, levels= taxa_levels)
+
+df_112$BS <- str_split(df_112$group, "_", simplify = TRUE)[, 2]
+
+df_112 <- df_112[complete.cases(df_112),]
+
+# Create the plot
+
+# Raw samples
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_Raw_taxarelabundance.tiff", units="in", width=7, height=6, res=300)
+ggplot(df_112[str_detect(df_112$group, "_Raw"), ], aes(x = x, y = y, color = Taxa, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
+  geom_point(size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE, method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  scale_color_manual(values = vec_col0[1:15]) +
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (Raw Samples)",
+    subtitle = "Analysis of Relative Abundance Across Taxa",
+    x = "Volunteer 1 (timepoint 1) (rpkm)",
+    y = "Volunteer 1 (timepoint 2) (rpkm)",
+    color = "Taxa",
+    shape = paste("BodySite.",  "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_Raw")])), "samples from each tp)")
+  ) +
+  stat_cor(data = df_112[str_detect(df_112$group, "_Raw"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+  # Add regression equation text
+  # geom_text(
+  #   x = log(10), y = log(150000),
+  #   label = lm_eqn(df_112[str_detect(df_112$group, "_Raw"), c(2, 3)]),
+  #   parse = TRUE, hjust = 0, size = 3, color = "black"
+  # ) +
+  guides(
+    color = guide_legend(ncol = 1),
+    shape = guide_legend(ncol = 2) 
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+)
+#dev.off()
+
+#PMA samples
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_PMA_taxarelabundance.tiff", units="in", width=7, height=6, res=300)
+ggplot(df_112[str_detect(df_112$group, "_PMA"), ], aes(x = x, y = y, color = Taxa, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
+  geom_point(size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE, method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  scale_color_manual(values = vec_col0[1:15]) +
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (PMA Samples)", 
+    subtitle = "Analysis of Relative Abundance Across Taxa",
+    x = "Volunteer 1 (timepoint 1) (rpkm)",
+    y = "Volunteer 1 (timepoint 2) (rpkm)",
+    color = "Taxa",
+    shape = paste("BodySite.", "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_PMA")])), "samples from each tp)")
+  ) +
+  stat_cor(data = df_112[str_detect(df_112$group, "_PMA"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+  # Add regression equation text
+  # geom_text(
+  #   x = log(5), y = log(150000),
+  #   label = lm_eqn(df_112[str_detect(df_112$group, "_PMA"), c(2, 3)]),
+  #   parse = TRUE, hjust = 0, size = 3, color = "black"
+  # ) +
+     guides(
+    color = guide_legend(ncol = 1),
+    shape = guide_legend(ncol = 2) 
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+  )
+#dev.off()
+
+```
+
+## Taxa Absolute Abundance Correlation
+
+## Only keeping samples that have both raw and PMA treated versions
+
+```{r}
+
+temp <- colnames(df)[str_detect(colnames(df), "-PMA")]
+temp <- str_replace(temp, "-PMA", "")
+temp2 <- colnames(df[,-1])[!str_detect(colnames(df[,-1]), "-PMA")]
+temp3 <- c(intersect(temp, temp2), paste(intersect(temp, temp2), "-PMA", sep = ""), "Taxa")
+  
+df <- df[ ,colnames(df) %in% temp3]
+
+#write(colnames(df)[!colnames(df) %in% "Taxa"], "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/sample_names_paired.txt", sep = "\n")
+
+```
+
+```{r}
+
+df <- melt(df)
+
+df$PMA <- str_split(df$variable, "-", simplify = TRUE)[, 3]
+df$PMA <- ifelse(df$PMA == "", "Raw", df$PMA)
+
+df$variable <- str_replace(df$variable, "-PMA", "")
+
+df$PMA <- paste(df$Taxa, df$PMA, sep = "_")
+
+df <- dcast(df, PMA~variable, value.var = "value")
+
+df[, -1] <- apply(df[, -1], 2, function(x) x/1e6)
+
+# Align df2$total with the columns of df1
+counts <- counts[match(colnames(df[, -1]), counts$Sample), , drop = FALSE]
+
+# Multiply each column in df1 by the corresponding value in df2$total
+df1_pma <- sweep(df[str_detect(df$PMA, "_PMA"),-1], 2, counts$PMA, "*")
+
+df1_pma$Sample <- df$PMA[str_detect(df$PMA, "_PMA")]
+
+df1_pma$Sample <- str_replace(df1_pma$Sample, "_PMA", "")
+
+df1_raw <- sweep(df[!str_detect(df$PMA, "_PMA"),-1], 2, counts$Raw, "*")
+
+df1_raw$Sample <- df$PMA[str_detect(df$PMA, "_PMA")]
+
+df1_raw$Sample <- str_replace(df1_raw$Sample, "_PMA", "")
+
+df1_pma <- melt(df1_pma)
+
+df1_pma$group <-paste(df1_pma$Sample, df1_pma$variable, sep = "_")
+
+df1_raw <- melt(df1_raw)
+
+df1_raw$group <-paste(df1_raw$Sample, df1_raw$variable, sep = "_")
+
+df <- df1_pma[, c(4, 3)]
+colnames(df)[2] <- "PMA"
+
+df <- merge(df, df1_raw[, c(4,3)], by = "group")
+
+colnames(df)[3] <- "Raw"
+
+df$Taxa <- str_split(df$group, "_", simplify = TRUE)[, 1]
+
+df$BS <- str_split(str_split(df$group, "_", simplify = TRUE)[, 2], "-", simplify = TRUE)[, 2]
+
+df$Skin_Type <- ifelse(df$BS %in% c("FH", "UB"), "sebaceous",
+                       ifelse(df$BS  %in% c("AC", "PC"), "moist", "dry"))
+
+df$Sample <- str_split(df$group, "_", simplify = TRUE)[, 2]
+
+df <- df[, c(4:7, 2,3)]
+
+```
+
+```{r}
+
+df_112 <- melt(df)
+
+df_112 <- df_112[str_split(df_112$Sample, "-", simplify = TRUE)[, 1] == "1" | str_split(df_112$Sample, "-", simplify = TRUE)[, 1] == "12",]
+
+df_112$Ind <- str_split(df_112$Sample, "-", simplify = TRUE)[, 1]
+
+df_112$group <- paste(df_112$Taxa, df_112$BS, df_112$variable, sep = "_") 
+
+df_112 <- df_112[, c(6, 7, 8)]
+
+df_112 <- dcast(df_112, group~Ind, value.var = "value")
+
+colnames(df_112)[-1] <- c("x", "y")
+
+df_112$Taxa <- str_split(df_112$group, "_", simplify = TRUE)[, 1]
+
+df_112$Taxa <- ordered(df_112$Taxa, levels= c(taxa_levels, "other"))
+
+df_112$BS <- str_split(df_112$group, "_", simplify = TRUE)[, 2]
+
+df_112 <- df_112[complete.cases(df_112),]
+
+# Create the plot
+
+# Raw samples
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_Raw_taxaabsabundance.tiff", units="in", width=7, height=6, res=300)
+ggplot(df_112[str_detect(df_112$group, "_Raw"), ], aes(x = x, y = y, color = Taxa, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
+  geom_point(size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE, method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  scale_color_manual(values = vec_col0[1:15]) +
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (Raw Samples)",
+    subtitle = "Analysis of Absolute Abundance Across Taxa",
+    x = "Volunteer 1 (timepoint 1) (cells per sq cm)",
+    y = "Volunteer 1 (timepoint 2) (cells per sq cm)",
+    color = "Taxa",
+    shape = paste("BodySite.",  "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_Raw")])), "samples from each tp)")
+  ) +
+  # Add regression equation text
+ stat_cor(data = df_112[str_detect(df_112$group, "_Raw"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+   guides(
+    color = guide_legend(ncol = 1),
+    shape = guide_legend(ncol = 2) 
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+)
+#dev.off()
+
+#PMA samples
+
+#tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_PMA_taxaabsabundance.tiff", units="in", width=7, height=6, res=300)
+ggplot(df_112[str_detect(df_112$group, "_PMA"), ], aes(x = x, y = y, color = Taxa, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
+  geom_point(size = 3, alpha = 0.8, stroke = 0.5) +
+  # Add regression line with confidence interval
+  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE, method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
+  scale_color_manual(values = vec_col0[1:15]) +
+  theme_minimal(base_size = 14) +
+  # Add plot labels and a formatted title
+  labs(
+    title = "Correlation Between Volunteers (PMA Samples)", 
+    subtitle = "Analysis of Absolute Abundance Across Taxa",
+    x = "Volunteer 1 (timepoint 1) (cells per sq cm)",
+    y = "Volunteer 1 (timepoint 2) (cells per sq cm)",
+    color = "Taxa",
+    shape = paste("BodySite.", "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_PMA")])), "samples from each tp)")
+  ) +
+  stat_cor(data = df_112[str_detect(df_112$group, "_PMA"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
+     guides(
+    color = guide_legend(ncol = 1),
+    shape = guide_legend(ncol = 2) 
+  ) +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90", size = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+  )
+#dev.off()
+
+```
+
+
+
