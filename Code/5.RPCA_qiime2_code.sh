@@ -1,4 +1,4 @@
-# This script, written for shell, is to be run after running the Pre-processing scripts, and the Rmd scripts 0, 1, 2.
+# This script is written for shell to make use of the qiime2 plugin of the gemelli DEICODE RPCA package. 
 
 #Using qiime2 (qiime2-2022.11) RPCA feature via DEICODE plugin
 
