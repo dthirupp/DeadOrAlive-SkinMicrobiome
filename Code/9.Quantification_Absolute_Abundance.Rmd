@@ -1,5 +1,5 @@
 ---
-title: "7. Absolute_Abundance_estimation"
+title: "Absolute_Abundance_estimation"
 author: "Deepan"
 date: "12/30/2024"
 output: html_document
@@ -164,104 +164,6 @@ length(counts$PMA[complete.cases(counts$PMA)])
 write.table(counts, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/absolute_counts.tsv", row.names = FALSE, sep = "\t", quote = FALSE)
 
 ```
-
-```{r}
-
-df_112 <- counts[str_split(counts$Sample, "-", simplify = TRUE)[, 1] == "1" | str_split(counts$Sample, "-", simplify = TRUE)[, 1] == "12",]
-
-df_112 <- df_112[, c(1:3, 7, 8)]
-
-df_112 <- melt(df_112)
-
-df_112$group <- paste(df_112$Body_Part, df_112$variable, sep = "_")
-
-df_112 <- dcast(df_112, group~Indiv, value.var = "value")
-
-df_112 <- df_112[complete.cases(df_112),]
-
-colnames(df_112)[-1] <- c("x", "y")
-
-df_112$BS <- str_split(df_112$group, "_", simplify = TRUE)[, 1]
-
-tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_Raw_flowcytometerresults.tiff", units="in", width=7, height=6, res=300)
-ggplot(df_112[str_detect(df_112$group, "_Raw"), ], aes(x = x, y = y, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
-  geom_point( size = 3, alpha = 0.8, stroke = 0.5) +
-  # Add regression line with confidence interval
-  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE, method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
-  theme_minimal(base_size = 14) +
-  # Add plot labels and a formatted title
-  labs(
-    title = "Correlation Between Volunteers (Raw Samples)",
-    subtitle = "Analysis of Cells per sq cm",
-    x = "Volunteer 1 (timepoint 1) (cells per sq cm)",
-    y = "Volunteer 1 (timepoint 2) (cells per sq cm)",
-    color = "Taxa",
-    shape = paste("BodySite",  "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_Raw")])), "samples from each tp)")
-  ) +
- stat_cor(data = df_112[str_detect(df_112$group, "_Raw"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman") +
-   guides(
-    color = guide_legend(ncol = 1),
-    shape = guide_legend(ncol = 2) 
-  ) +
-    scale_y_log10() +
-  scale_x_log10() +
-  theme(
-    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
-    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
-    legend.position = "right",
-    legend.title = element_text(size = 12, face = "bold"),
-    legend.text = element_text(size = 10),
-    axis.title.x = element_text(size = 12),
-    axis.title.y = element_text(size = 12),
-    axis.text = element_text(size = 10),
-    panel.grid.major = element_line(color = "gray90", size = 0.5),
-    panel.grid.minor = element_blank(),
-    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
-)
-dev.off()
-
-
-tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/Correlation_112_PMA_flowcytometerresults.tiff", units="in", width=7, height=6, res=300)
-ggplot(df_112[str_detect(df_112$group, "_PMA"), ], aes(x = x, y = y, shape = ordered(BS, levels = c("FH", "UB", "AC", "PC", "FA", "Abd")))) +
-  geom_point(size = 3, alpha = 0.8, stroke = 0.5) +
-  # Add regression line with confidence interval
-  geom_smooth(aes(x = x, y = y), inherit.aes = FALSE,method = "lm", se = TRUE, color = "black", linewidth = 0.8) +
-  theme_minimal(base_size = 14) +
-  # Add plot labels and a formatted title
-  labs(
-    title = "Correlation Between Volunteers (PMA Samples)",
-    subtitle = "Analysis of Cells per sq cm",
-    x = "Volunteer 1 (timepoint 1) (cells per sq cm)",
-    y = "Volunteer 1 (timepoint 2) (cells per sq cm)",
-    color = "Taxa",
-    shape = paste("BodySite",  "(n =", length(unique(df_112$BS[str_detect(df_112$group, "_PMA")])), "samples from each tp)")
-  ) +
-  # Add regression equation text
-  stat_cor(data = df_112[str_detect(df_112$group, "_PMA"), c(2,3)], aes(x = x, y = y), inherit.aes = FALSE, p.accuracy = 0.001, r.accuracy = 0.01, method = "spearman", label.y = 6) +
-   guides(
-    color = guide_legend(ncol = 1),
-    shape = guide_legend(ncol = 2) 
-  ) +
-  scale_y_log10() +
-  scale_x_log10() +
-  theme(
-    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),
-    plot.subtitle = element_text(hjust = 0.5, size = 12, margin = margin(b = 10)),
-    legend.position = "right",
-    legend.title = element_text(size = 12, face = "bold"),
-    legend.text = element_text(size = 10),
-    axis.title.x = element_text(size = 12),
-    axis.title.y = element_text(size = 12),
-    axis.text = element_text(size = 10),
-    panel.grid.major = element_line(color = "gray90", size = 0.5),
-    panel.grid.minor = element_blank(),
-    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
-)
-dev.off()
-
-
-```
-
 
 ```{r}
 
@@ -664,7 +566,6 @@ counts %>% kruskal_effsize(percent_live ~ Body_Part)
 #effect size is large. Proceed with Dunn's test
 pwc <- counts %>% 
   dunn_test(percent_live ~ Body_Part, p.adjust.method = "fdr")
-pwc
 
 tiff("/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/TIFFs/PercentLive_BodySite.tiff", units="in", width=5, height=5, res=300)
 ggplot(counts, aes(x = Body_Part, y= percent_live)) + 
@@ -680,8 +581,6 @@ ggplot(counts, aes(x = Body_Part, y= percent_live)) +
   labs( y = "Percentage (%)") +
   theme_boxp() + theme(legend.position = "none", axis.text.x = element_text(angle = 0))
 dev.off()
-
-#pwc
 
 ```
 
