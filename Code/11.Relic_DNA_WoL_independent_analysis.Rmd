@@ -4,12 +4,6 @@ author: "Deepan"
 date: "1/17/2025"
 output: html_document
 ---
----
-title: "9. Relic_DNA_estimation"
-author: "Deepan"
-date: "1/14/2025"
-output: html_document
----
 
 ## Load libraries
 
