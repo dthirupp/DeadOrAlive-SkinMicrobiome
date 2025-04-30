@@ -135,21 +135,6 @@ python .../zebra_filter/calculate_coverages.py -i ./samfiles -o SMGC_coverages.t
 
 # Move to R script ("Rmd/0.Zebra_coverages_calculated_aligningtoSMGC") to determine what coverage threshold top pick. This should be the global minima in the genome coverage density plots. 
 
-# Filter samfiles based on coverage cutoff. 60 percent was the global minima for this dataset. 
-
-echo -e "\nfiltering sam files based on the cutoff, deteremined separately in an R script"
-
-python .../zebra_filter/filter_sam.py -i SMGC_coverages.txt  -s samfiles/ -c 0.60 -o filtered_SMGC_samfiles/
-
-# Making feature table using default mode (keep them all and divide) and no rank using woltka --classify.
-
-woltka classify -i filtered_60perc_SMGC_samfiles -o SMGC_60perc.biom 
-
-## for WoL
-woltka classify --input ./WoL_samfiles --map ~/*location_of_WoL*/taxonomy/taxid.map --nodes ~/*location_of_WoL*/taxonomy/nodes.dmp --names ~/*location_of_WoL*/taxonomy/names.dmp --output ./WoL_aligned.biom --rank species --name-as-id
-
-conda deactivate
-
 
 
 
