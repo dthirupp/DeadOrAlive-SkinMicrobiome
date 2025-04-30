@@ -46,83 +46,6 @@ colnames(df) <- str_replace(colnames(df), "1bis-", "12-")
 
 ```
 
-## Extract only the columns of 1 and 1bis for averaging
-
-```{r}
-# 
-# df_one <- df[ , str_detect( colnames(df), "#OTU|1-|1bis-")]
-# df_one <- df_one[,  !str_detect( colnames(df_one), "11-")]
-# 
-# #remove these columns from df
-# 
-# df <- df[ , colnames(df) %in% c("#OTU ID", colnames(df)[!colnames(df)%in%colnames(df_one)]) ]
-
-```
-
-## Function to keep only unique body-site volunteer 1 combos, or else calculate average [NOT DOING THIS ANYMORE]
-
-```{r}
-
-# Function to process the dataframe
-process_dataframe <- function(df) {
-  library(dplyr)
-
-  # Extract column names
-  col_names <- colnames(df)
-
-  # Parse patient numbers and body sites
-  parsed <- strcapture("^(\\d+)(bis)?-(.+)$", col_names, data.frame(Patient = character(), Bis = character(), Site = character()))
-  parsed$Bis[is.na(parsed$Bis)] <- ""  # Handle NAs for easier comparisons
-
-  # Group columns by patient and site
-  result <- df %>%
-    select(all_of(col_names)) %>%
-    {
-      # Loop through each unique combination of Patient and Site
-      unique_combinations <- unique(parsed[, c("Patient", "Site")])
-      purrr::map_dfc(1:nrow(unique_combinations), function(i) {
-        patient <- unique_combinations$Patient[i]
-        site <- unique_combinations$Site[i]
-
-        # Find relevant columns for this combination
-        cols_1 <- col_names[parsed$Patient == patient & parsed$Site == site & parsed$Bis == ""]
-        cols_bis <- col_names[parsed$Patient == patient & parsed$Site == site & parsed$Bis == "bis"]
-
-        if (length(cols_1) > 0 && length(cols_bis) > 0) {
-          # Case: Both 1 and 1bis exist -> Replace with average
-          colname <- paste0(patient, "-", site)
-          tibble(!!colname := rowMeans(select(., all_of(c(cols_1, cols_bis)))))
-        } else if (length(cols_1) == 0 && length(cols_bis) > 0) {
-          # Case: Only 1bis exists -> Rename to 1
-          colname <- paste0(patient, "-", site)
-          rename(select(., all_of(cols_bis)), !!colname := everything())
-        } else if (length(cols_1) > 0 && length(cols_bis) == 0) {
-          # Case: Only 1 exists -> Keep as is
-          select(., all_of(cols_1))
-        }
-      })
-    }
-
-  result
-}
-
-# # Process the dataframe
-# processed_df <- cbind(process_dataframe(df_one[,-1]), df_one[,1])
-# processed_df <- processed_df[, c(ncol(processed_df), 1:(ncol(processed_df)-1))]
-# 
-# df_one <-processed_df
-# colnames(df_one)[1] <- "#OTU ID"
-
-```
-
-## Merging the processed df_one to make the correct, final tsv with all volunteers
-
-```{r}
-
-# df <- merge(df, df_one, by = "#OTU ID")
-
-```
-
 ## Making the correct order of the dataframe
 
 ```{r}
@@ -146,19 +69,6 @@ write.table( df[, colnames(df) %in% c( "#OTU ID", colnames(df)[str_detect(colnam
 write.table( df[, colnames(df) %in% c( "#OTU ID", colnames(df)[!str_detect(colnames(df), "-PMA")])], "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/Final_rpca_raw.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
 
 write.table( df, "/media/deepan/Deepan/LiveDead/igm-storage2.ucsd.edu/220428_A00953_0539_AHMNLKDSX3/202410_revision/swab_blank_removed/Final_rpca_all.tsv", row.names = FALSE, sep = "\t" , quote = FALSE)
-
-```
-
-## Keeping only samples that have matching Raw and PMA treated samples
-
-```{r}
-
-# samples <- c("#OTU ID", "1-AC-PMA", "1-AC", "1-FH-PMA", "1-FH", "1-UB-PMA", "1-UB", "2-AC-PMA", "2-AC", "2-FH-PMA", "2-FH", "2-UB-PMA", "2-UB", "3-FH-PMA", "3-FH", "3-PC-PMA", "3-PC", "3-UB-PMA", "3-UB", "4-AC-PMA", "4-AC", "4-FA-PMA", "4-FA", "4-FH-PMA", "4-FH", "4-PC-PMA", "4-PC", "4-UB-PMA", "4-UB", "5-AC-PMA", "5-AC", "5-FA-PMA", "5-FA", "5-PC-PMA", "5-PC", "5-UB-PMA", "5-UB", "6-AC-PMA", "6-AC", "6-FH-PMA", "6-FH", "6-PC-PMA", "6-PC", "6-UB-PMA", "6-UB", "7-FA-PMA", "7-FA", "7-FH-PMA", "7-FH", "7-PC-PMA", "7-PC", "7-UB-PMA", "7-UB", "8-AC-PMA", "8-AC", "8-Abd-PMA",  "8-Abd",  "8-FA-PMA", "8-FA", "8-FH-PMA", "8-FH", "8-PC-PMA", "8-PC", "8-UB-PMA", "8-UB", "9-AC-PMA", "9-AC", "9-FH-PMA", "9-FH", "9-PC-PMA", "9-PC", "10-Abd-PMA", "10-Abd", "10-FA-PMA", "10-FA", "10-FH-PMA", "10-FH", "10-UB-PMA",  "10-UB",  "11-AC-PMA",  "11-AC", "11-FA-PMA", "11-FA",  "11-FH-PMA", "11-FH", "11-PC-PMA",  "11-PC",  "11-UB-PMA",  "11-UB")
-# 
-# 
-# df <- df[, colnames(df) %in% samples ]
-
-```
 
 
 ## Export
