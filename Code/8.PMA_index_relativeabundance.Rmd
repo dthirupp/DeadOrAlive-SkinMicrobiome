@@ -24,6 +24,8 @@ library(reshape)
 library(reshape2)
 library(gplots)
 library(RColorBrewer)
+library(dplyr)
+
 ```
 
 ## Define color vectors
